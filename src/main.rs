@@ -1,0 +1,436 @@
+use std::{
+    path::PathBuf,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
+
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
+use clap::Parser;
+use colored::Colorize;
+use geocoding::Reverse;
+use rand::distributions::Distribution;
+use savefile::prelude::*;
+use strum::EnumCount;
+use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
+
+#[macro_use]
+extern crate savefile_derive;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// File to run
+    file:      Option<PathBuf>,
+    #[arg(short, long)]
+    subscribe: bool,
+}
+
+fn report_error(string: String) -> ! {
+    eprintln!("{}: {string}", "ERROR".bold().red());
+    std::process::exit(1);
+}
+
+fn report_warning(string: String) {
+    eprintln!("{}: {string}", "WARNING".bold().yellow());
+}
+
+enum Token {
+    Number(u32),
+    Add,
+    Dup,
+    Drop,
+    Swap,
+    Over,
+    Rot,
+    Print,
+}
+
+fn parse_file(path: &PathBuf) -> Vec<Token> {
+    let contents = match std::fs::read_to_string(path) {
+        Ok(string) => string,
+        Err(err) => {
+            report_error(format!("File could not be read because {}", err));
+        }
+    };
+    let mut tokens = Vec::new();
+    for token in contents.split_whitespace() {
+        tokens.push(match token {
+            "+" => Token::Add,
+            "dup" => Token::Dup,
+            "drop" => Token::Drop,
+            "swap" => Token::Swap,
+            "over" => Token::Over,
+            "rot" => Token::Rot,
+            "print" => Token::Print,
+            x if x.parse::<u32>().is_ok() => Token::Number(x.parse().unwrap()),
+            unrecognized => {
+                report_error(format!("Unrecognized token {unrecognized}"));
+            }
+        })
+    }
+    tokens
+}
+
+fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
+    if out_of_free_runs {
+        let local_ip = local_ip_address::local_ip().expect("I'm so done").to_string();
+        let info = geolocation::find(local_ip.as_str()).expect("What");
+        let (longitude, latitude) = (info.longitude.parse::<f64>().unwrap_or(180.0), info.latitude.parse::<f64>().unwrap_or(0.0));
+        let openstreetmap = geocoding::Openstreetmap::new();
+        let location = openstreetmap.reverse(&geocoding::Point::new(-longitude, 180.0 - latitude));
+        println!(
+            "Connecting to our servers in {}, our datacenter that is nearest to you!",
+            location.unwrap_or(Some("Antarctica".to_string())).unwrap_or("Antarctica".to_string())
+        );
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+    let mut stack: Vec<u32> = Vec::new();
+    for token in tokens {
+        if out_of_free_runs {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+        match token {
+            Token::Number(x) => stack.push(*x),
+            Token::Add => {
+                if stack.len() < 2 {
+                    report_error("The stack must contain at least two elements for an addition to be made".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(a + b);
+            }
+            Token::Dup => {
+                if stack.is_empty() {
+                    report_error("The stack must contain at least one element for it to be duplicated".to_string());
+                }
+                stack.push(*stack.last().unwrap());
+            }
+            Token::Drop => {
+                if stack.is_empty() {
+                    report_error("The stack must contain at least one element for it to be dropped".to_string());
+                }
+                let _ = stack.pop();
+            }
+            Token::Swap => {
+                if stack.len() < 2 {
+                    report_error("The stack must contain at least two elements for them to be swapped".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(a);
+                stack.push(b);
+            }
+            Token::Over => {
+                if stack.len() < 2 {
+                    report_error("The stack must contain at least two elements for them to be overed".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(b);
+                stack.push(a);
+                stack.push(b);
+            }
+            Token::Rot => {
+                if stack.len() < 3 {
+                    report_error("The stack must contain at least three elements for them to be roted".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                let c = stack.pop().unwrap();
+                stack.push(b);
+                stack.push(a);
+                stack.push(c);
+            }
+            Token::Print => {
+                if stack.is_empty() {
+                    report_error("The stack must contain at least one element for it to be printed".to_string());
+                }
+                println!("{}", stack.pop().unwrap())
+            }
+        }
+    }
+}
+
+// This part of the program serves absolutly no reason is just here because
+// I find it incredibly funny.
+
+/* List of "features":
+
+- Update every day of around 1GB (size randomly determined and based on actual download speed)
+- A required account, otherwise no basic ass stack based language for you
+- Certain amount of free runs, afterwards only free runs on "bad server infrastructure" possible unless you have the "Pro subscription" (The program just runs with delays between instructions, no subscriptions exist)
+- The server for both of these will have a chance of having an outage.
+- Internet connection is required
+- The server location is determined based on your real location, but it is on the exact opposite side of the world (I can't get this to work right now so the servers are in Antarctica)
+- A desktop notification asking you if you want to subscribe to a mailing list that doesn't exist.
+- Show an ad for an "evil" megacorporation before the program runs.
+- The actual funny thing about this entire project is the absolute dependency spam because of all the useless tomfoolery (It is absolutly intended that the program uses two different rng crates for example)
+
+*/
+
+#[derive(EnumCountMacro, EnumIter)]
+enum Advertisement {
+    Temu,
+    Shein,
+    BetterHelp,
+    Nestle,
+    JohnsonJohnson,
+    CocaCola,
+    McDonalds,
+}
+
+// This is satire, but mostly based in fact. I encourage you to correct me
+// if any newer information surfaces. I also encourage you to include more
+// examples if there are more current ones.
+impl std::fmt::Display for Advertisement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::Temu => "You support slave labor and genocide? Buy from our sponsor Temu!",
+            Self::Shein => "You support exploiting small designers, genocide and slave labor? Buy clothes from our sponsor Shein!",
+            Self::BetterHelp => "You want Facebook to have your sensitive medical records? Get online therapy from our sponsor BetterHelp!",
+            Self::Nestle => "You enjoy stealing the water of African villages, bottling it and then selling it to them? Buy from our sponsor Nestlé!",
+            Self::JohnsonJohnson => "You enjoy getting even richer by letting people in third-world countries die? Buy drugs from our sponsor Johnson & Johnson!",
+            Self::CocaCola => "You enjoy infesting our seas with microplastics? Buy a refreshing beverage from our sponsor Coca-Cola!",
+            Self::McDonalds => "You support McDonalds? Go shop at McDonalds!",
+        })
+    }
+}
+
+impl Distribution<Advertisement> for rand::distributions::Standard {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Advertisement {
+        assert_eq!(Advertisement::COUNT, 7); // If the match below isn't updated when a new Advertisement is added, it
+                                             // won't be added to the rotation
+        match rng.gen_range(0..Advertisement::COUNT) {
+            0 => Advertisement::Temu,
+            1 => Advertisement::Shein,
+            2 => Advertisement::BetterHelp,
+            3 => Advertisement::Nestle,
+            4 => Advertisement::JohnsonJohnson,
+            5 => Advertisement::CocaCola,
+            6 => Advertisement::McDonalds,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Savefile)]
+struct Account {
+    name:          String,
+    // Yes I am actually taking a programming account (that doesn't do anything) serious enough to actually use encryption.
+    password_hash: String,
+}
+
+#[derive(Savefile)]
+struct SaveData {
+    account:     Option<Account>,
+    runs_so_far: usize,
+    last_update: u64, // This is in seconds since UNIX_EPOCH
+}
+
+const TEST_FILE: (&str, u64) = ("https://speed.hetzner.de/100MB.bin", 100_000_000); // This file is used to measure download speed
+
+const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1;
+
+const FREE_RUNS: usize = 5;
+
+const UPDATE_SIZE: u64 = 1_000_000_000;
+const UPDATE_VARIATION: u64 = 300_000_000;
+const DOWNLOAD_SPEED_VARIATION: f64 = 0.8;
+const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
+
+const FIRST_OPTION: &str = "Yes, proceed to login";
+const SECOND_OPTION: &str = "No, proceed to signup";
+
+fn sillyness(save_data: &mut SaveData) {
+    let _ = notify_rust::Notification::new()
+        .summary("Do you want to subscribe to our mailing list?")
+        .body("Shoot an email to gian.zellweger@ict-scouts.ch and you will automatically be added to the mailing list!")
+        .appname("Mailing List Subscriber")
+        .auto_icon()
+        .sound_name("alarm-clock-elapsed")
+        .timeout(0)
+        .show(); // This notification will not go away unless you dismiss it.
+
+    let has_internet = reqwest::blocking::get("https://google.com").is_ok(); // Googles servers are always up so I'm using them
+    if !has_internet {
+        report_error("To use this programming language, you need an internet connection!".to_string());
+    }
+    if fastrand::f64() <= CHANCE_OF_SERVER_MAINTAINANCE {
+        report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!".to_string());
+    }
+
+    let random_advertisement: Advertisement = rand::random();
+
+    println!("{}", random_advertisement.to_string().yellow().on_purple().bold());
+
+    let argon2 = Argon2::default();
+
+    match inquire::Select::new("To use this programming language, you need a BadLang™ Account. Do you already have one?", vec![
+        FIRST_OPTION,
+        SECOND_OPTION,
+    ])
+    .without_help_message()
+    .prompt()
+    .expect("What")
+    {
+        x if x == SECOND_OPTION => {
+            let name = inquire::Text::new("Enter your name: ")
+                .with_validator(inquire::required!())
+                .with_validator(inquire::min_length!(16))
+                .prompt()
+                .expect("Enter your name");
+
+            let password = inquire::Password::new("Enter your password: ")
+                .with_display_toggle_enabled()
+                .without_confirmation()
+                .with_validator(inquire::required!())
+                .with_validator(inquire::min_length!(18))
+                .prompt()
+                .expect("Enter a password");
+            let password_repetition = inquire::Password::new("Repeat your password: ")
+                .with_display_toggle_enabled()
+                .without_confirmation()
+                .with_validator(inquire::required!())
+                .with_validator(inquire::min_length!(18))
+                .prompt()
+                .expect("Enter a password");
+            let password_repetition2 = inquire::Password::new("Repeat your password again: ")
+                .with_display_toggle_enabled()
+                .without_confirmation()
+                .with_validator(inquire::required!())
+                .with_validator(inquire::min_length!(18))
+                .prompt()
+                .expect("Enter a password");
+
+            if !(password == password_repetition && password_repetition == password_repetition2 && password == password_repetition2) {
+                report_error("Your passwords do not match!".to_string());
+            }
+            let salt = SaltString::generate(&mut OsRng);
+            let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
+            save_data.account = Some(Account { name, password_hash });
+            println!("{}! Account saved!", "SUCCESS".green());
+        }
+        x if x == FIRST_OPTION => {
+            if save_data.account.is_none() {
+                report_error("You do infact not have an account".to_string());
+            }
+            let account = save_data.account.as_ref().unwrap();
+            let name = inquire::Text::new("Enter your name: ")
+                .with_validator(inquire::required!())
+                .with_validator(inquire::min_length!(16))
+                .prompt()
+                .expect("Enter your name");
+
+            let password = inquire::Password::new("Enter your password: ")
+                .with_display_toggle_enabled()
+                .without_confirmation()
+                .with_validator(inquire::required!())
+                .with_validator(inquire::min_length!(18))
+                .prompt()
+                .expect("Enter a password");
+
+            let parsed_hash = PasswordHash::new(&account.password_hash).expect("Oh no");
+            if name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok() {
+                println!("{}! Logged in successfully", "SUCCESS".green());
+            } else {
+                report_error("Either your name or password were wrong. Try again!".to_string());
+            }
+        }
+        _ => unreachable!(),
+    }
+
+    if SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs() - save_data.last_update > (24 * 60 * 60) {
+        // if true { // This is for testing. Remove it or don't
+        let update_size = fastrand::u64((UPDATE_SIZE - UPDATE_VARIATION)..(UPDATE_SIZE + UPDATE_VARIATION));
+        let (download_time, content_length) = {
+            let start = Instant::now();
+            let content_length = match reqwest::blocking::get(TEST_FILE.0) {
+                Ok(ok) => {
+                    let content_length = ok.content_length().unwrap_or(TEST_FILE.1);
+                    print!("{}", ok.text().unwrap_or("".to_string())); // This print is stupid because it shouldn't need to be here. It just won't
+                                                                       // measure any download speed otherwise and since the file is "empty" it
+                                                                       // doesn't actually print anything. But I'm leaving it here because I feel
+                                                                       // it fits with the feel of the program
+                    content_length
+                }
+                Err(err) => report_error(format!("Couldn't download update because {err}")),
+            };
+            (start.elapsed(), content_length)
+        };
+        let download_speed = content_length as f64 / download_time.as_secs_f64();
+        let mut progress = 0;
+        let progress_bar = indicatif::ProgressBar::new(update_size);
+        let mut iteration: usize = 0;
+        while progress < update_size {
+            let increment = fastrand::u64(
+                (((1.0 - DOWNLOAD_SPEED_VARIATION) * download_speed / DOWNLOAD_UPDATE_INTERVAL) as u64)..(((1.0 + DOWNLOAD_SPEED_VARIATION) * download_speed / DOWNLOAD_UPDATE_INTERVAL) as u64),
+            );
+            progress_bar.set_style(
+                indicatif::ProgressStyle::with_template(
+                    format!(
+                        "Downloading update{:<4} {{wide_bar}} {{bytes}}/{{total_bytes}} [{}/s]",
+                        ".".repeat((iteration % 3) + 1),
+                        humansize::format_size(increment, humansize::BINARY)
+                    )
+                    .as_str(),
+                )
+                .unwrap(),
+            );
+            iteration += 1;
+            progress_bar.inc(increment);
+            progress += increment;
+            std::thread::sleep(std::time::Duration::from_secs_f64(DOWNLOAD_UPDATE_INTERVAL));
+        }
+        progress_bar.finish();
+        println!("Applying update...");
+        std::thread::sleep(std::time::Duration::from_secs(10)); // It's literally just constant.
+        save_data.last_update = SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs();
+    }
+
+    let exec_name = std::env::args().next().expect("How did you manage this one again?");
+    save_data.runs_so_far += 1;
+    if save_data.runs_so_far < FREE_RUNS {
+        report_warning(format!(
+            "You have used {} out of your {FREE_RUNS} free runs. Afterwards, the program will run on our bronze tier server infrastructure, unless you subscribe to either our gold or platinum \
+             subscription tier. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`",
+            save_data.runs_so_far
+        ));
+    } else {
+        report_warning(format!(
+            "You have used up all your free runs and your program will now run on our bronze tier server infrastructure. Subscribe to our gold or platinum tier to run your programs on your device \
+             or on our gold tier server infrastructure. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`"
+        ))
+    }
+}
+
+// The silly part is over. Thank god
+
+fn main() {
+    let mut save_data = match load_file("badlang.bin", 0) {
+        Ok(sd) => sd,
+        Err(_) => SaveData {
+            account:     None,
+            runs_so_far: 0,
+            last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
+        },
+    };
+
+    let args = Args::parse();
+    if args.subscribe {
+        let _ = open::that("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+        report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/".to_string());
+    }
+
+    sillyness(&mut save_data);
+
+    save_file("badlang.bin", 0, &save_data).expect("Couldn't save damn");
+
+    let tokens = match args.file {
+        Some(path) => parse_file(&path),
+        None => report_error("Please provide a path to run!".to_string()),
+    };
+
+    execute_tokens(&tokens, save_data.runs_so_far >= FREE_RUNS);
+}
