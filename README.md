@@ -26,7 +26,7 @@ There is no Hello World in BadLang™. Why would you want such an inefficient pr
 
 ### Addition
 
-Addition is where this program really shines! We can add two, even three numbers! Bet your C can't do that!
+Addition is where this programming language really shines! We can add two, even three numbers! Bet your C can't do that!
 ```
 34 35 + print
 ```
