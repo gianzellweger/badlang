@@ -1,5 +1,7 @@
 # BadLang™ - The future of programming
 
+![BadLang™ Logo](logo.png)
+
 This language isn't just the next trend - it's the future. You've heard of "Rewrite it in Rust". Soon you will hear "Rewrite it in BadLang™" (The ™ is pronounced).
 
 This language features the newest paradigm: Stack-based programming. You've heard of imperative, you've heard of functional, but have you heard of stack-based? It was established in 1970 by the Forth language, so probably not.
