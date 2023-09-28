@@ -1,6 +1,14 @@
 [package]
 name = "badlang"
 version = "0.1.0"
+authors = ["Gian Zellweger <gian.zellweger@ict-scouts.ch"]
+rust-version = "1.72.0"
+description = "Next generation stack-based programming language"
+documentation = "https://github.com/gianzellweger/badlang/README.md"
+readme = "README.md"
+repository = "https://github.com/gianzellweger/badlang"
+license = "CC0-1.0"
+keywords = ["language", "programming", "programming-language"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
