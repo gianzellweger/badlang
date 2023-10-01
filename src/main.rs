@@ -408,7 +408,12 @@ fn sillyness(save_data: &mut SaveData) {
 // The silly part is over. Thank god
 
 fn main() {
-    let mut save_data = match load_file("badlang.bin", 0) {
+    let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
+    savefile_path.push(".config");
+    savefile_path.push("badlang");
+    savefile_path.push("badlang.bin");
+
+    let mut save_data = match load_file(&savefile_path, 0) {
         Ok(sd) => sd,
         Err(_) => SaveData {
             account:     None,
@@ -425,7 +430,13 @@ fn main() {
 
     sillyness(&mut save_data);
 
-    save_file("badlang.bin", 0, &save_data).expect("Couldn't save damn");
+    if let Some(parent_dir) = savefile_path.parent() {
+        if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
+            report_error(format!("Couldn't create savefile because {err}"));
+        }
+    }
+
+    save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
 
     let tokens = match args.file {
         Some(path) => parse_file(&path),
