@@ -1,6 +1,6 @@
 # BadLang™ - The future of programming
 
-![BadLang™ Logo](logo.png)
+<img alt="BadLang™ Logo" src="logo.png" align="right" width="100%"/>
 
 This language isn't just the next trend - it's the future. You've heard of "Rewrite it in Rust". Soon you will hear "Rewrite it in BadLang™" (The ™ is pronounced).
 
