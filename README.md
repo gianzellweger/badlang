@@ -44,3 +44,7 @@ There are no comments in BadLang™. All code written in Badlang™ is self-docu
 ## Contributing
 
 If you want to contribute, you can either do so [financially](https://www.youtube.com/watch?v=dQw4w9WgXcQ) or read the [Contributing Guidelines](CONTRIBUTING.md)
+
+## Etymology
+
+The name "BadLang™" actually stands for "Badass Language", because that's what it is.
