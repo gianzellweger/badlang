@@ -1,5 +1,9 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::{
+    io::Write,
     path::PathBuf,
+    sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -9,7 +13,9 @@ use argon2::{
 };
 use clap::Parser;
 use colored::Colorize;
+use enigo::MouseControllable;
 use geocoding::Reverse;
+use inquire::validator::Validation;
 use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
@@ -23,6 +29,7 @@ extern crate savefile_derive;
 struct Args {
     /// File to run
     file:      Option<PathBuf>,
+    /// Open the subscription plans in a browser
     #[arg(short, long)]
     subscribe: bool,
 }
@@ -159,13 +166,16 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
 /* List of "features":
 
 - Update every day of around 1GB (size randomly determined and based on actual download speed)
-- A required account, otherwise no basic ass stack based language for you
+- A required account, otherwise no basic stack based language for you
 - Certain amount of free runs, afterwards only free runs on "bad server infrastructure" possible unless you have the "Pro subscription" (The program just runs with delays between instructions, no subscriptions exist)
 - The server for both of these will have a chance of having an outage.
 - Internet connection is required
 - The server location is determined based on your real location, but it is on the exact opposite side of the world (I can't get this to work right now so the servers are in Antarctica)
 - A desktop notification asking you if you want to subscribe to a mailing list that doesn't exist.
 - Show an ad for an "evil" megacorporation before the program runs.
+- Cookies
+- TOS
+x Random popup video
 - The actual funny thing about this entire project is the absolute dependency spam because of all the useless tomfoolery (It is absolutly intended that the program uses two different rng crates for example)
 
 */
@@ -200,8 +210,8 @@ impl std::fmt::Display for Advertisement {
 
 impl Distribution<Advertisement> for rand::distributions::Standard {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Advertisement {
-        assert_eq!(Advertisement::COUNT, 7); // If the match below isn't updated when a new Advertisement is added, it
-                                             // won't be added to the rotation
+        static_assertions::const_assert_eq!(Advertisement::COUNT, 7); // If the match below isn't updated when a new Advertisement is added, it
+                                                                      // won't be added to the rotation
         match rng.gen_range(0..Advertisement::COUNT) {
             0 => Advertisement::Temu,
             1 => Advertisement::Shein,
@@ -215,11 +225,38 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
     }
 }
 
+#[tauri::command]
+fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), String> {
+    static VELOCITY: Mutex<(i32, i32)> = Mutex::new((20, 20));
+    static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
+
+    let enigo = enigo::Enigo::new();
+    let (screen_x, screen_y) = enigo.main_display_size();
+    let mut position = POSITION.lock().unwrap();
+    let mut velocity = VELOCITY.lock().unwrap();
+    if position.0 > screen_x || position.0 < 0 {
+        velocity.0 = -velocity.0;
+    }
+    if position.1 > screen_y || position.1 < 0 {
+        velocity.1 = -velocity.1;
+    }
+
+    position.0 += velocity.0;
+    position.1 += velocity.1;
+
+    let _ = window.set_position(tauri::Position::Physical((*position).into()));
+
+    let _ = window.set_focus();
+    Ok(())
+}
+
 #[derive(Savefile)]
 struct Account {
-    name:          String,
+    name:               String,
     // Yes I am actually taking a programming account (that doesn't do anything) serious enough to actually use encryption.
-    password_hash: String,
+    password_hash:      String,
+    version:            String,
+    google_auth_secret: String,
 }
 
 #[derive(Savefile)]
@@ -229,7 +266,84 @@ struct SaveData {
     last_update: u64, // This is in seconds since UNIX_EPOCH
 }
 
-const TEST_FILE: (&str, u64) = ("https://speed.hetzner.de/100MB.bin", 100_000_000); // This file is used to measure download speed
+// These files are used to measure download speed. There are multiple
+// because there are actual server outages and I don't want people to miss
+// out on this one just because of such a tiny problem
+const TEST_FILE: [(&str, u64); 4] = [
+    ("https://speed.hetzner.de/100MB.bin", 100_000_000),
+    ("https://ash-speed.hetzner.com/100MB.bin", 100_000_000),
+    ("https://hel1-speed.hetzner.com/100MB.bin", 100_000_000),
+    ("https://fsn1-speed.hetzner.com/100MB.bin", 100_000_000),
+];
+
+// The cookies don't actually do anything. Yet.
+const TYPES_OF_COOKIES: [&str; 25] = [
+    "Authentication Cookies",
+    "Personalization Cookies",
+    "Shopping Cart Cookies",
+    "Analytics Cookies",
+    "Ad Targeting Cookies",
+    "Session Management Cookies",
+    "Security Cookies",
+    "Performance Cookies",
+    "Social Media Integration Cookies",
+    "Localization Cookies",
+    "Predictive Preference Cookies",
+    "Enhanced Virtual Reality Cookies",
+    "Celebrity Influence Cookies",
+    "Historical Context Cookies",
+    "Multiverse Browsing Cookies",
+    "Visual Communication Cookies",
+    "Extraterrestrial Inspiration Cookies",
+    "Mood Enhancement Cookies",
+    "Future Trend Cookies",
+    "Personalized Insights Cookies",
+    "Predictive Health Cookies",
+    "Behavioral Employment Cookies",
+    "Government Compliance Cookies",
+    "Mood Manipulation Cookies",
+    "Social Credit Cookies",
+];
+
+// These Terms of Service are not actually legally binding, refer to the
+// license for the actual legalese, don't sue me, etc.
+const TERMS_OF_SERVICE: &str = r#"Terms of Service
+
+1. Acceptance of Terms
+By continuing to read these musings, you agree to acknowledge the lighthearted nature of the content. If, however, you find yourself questioning the validity of our statements, consider this your cue to exit stage left.
+
+2. Changes to Terms
+We reserve the right to evolve these "Terms" at our discretion. Changes may occur without notice, and users will navigate the subtle shifts in the landscape unassisted.
+
+3. User Accounts
+Creating a user account involves a process known only to a select few. Your password is stored in a secure vault, accessible only to those who possess the secret passphrase.
+
+4. Content
+You can't post any content on BadLang™. Please exercise discretion, as some forms of expression may be subject to interpretation by our team of resident enigmatologists.
+
+5. Intellectual Property
+BadLang™ and its features belong to the collective imagination. Attempts to assert ownership may lead to a journey through the labyrinthine corridors of paradoxes and riddles.
+
+6. Termination
+We reserve the right to limit access to BadLang™. Banishment may lead you to discover other realms, where the unknown becomes the known.
+
+7. Governing Law
+These "Terms" are subject to the laws of Wakanda. In the event of any disputes, resolutions may be found in the concealed archives of ancient wisdom.
+
+8. Contact Us
+For inquiries about these enigmatic Terms, submit your questions through channels familiar to those initiated into the subtleties of subtle communication.
+
+ChatGPT
+BadLang™ Legal Team
+
+To accept, please type: 
+I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions
+"#;
+
+// Note: this is distinct from the text above in one very important way:
+// These spaces are actually spaces, while the ones above are the Unicode
+// character U+2002, which looks identical. This is to prevent copying.
+const ACCEPTANCE_PHRASE: &str = "I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions";
 
 const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1;
 
@@ -244,6 +358,25 @@ const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
 
 fn sillyness(save_data: &mut SaveData) {
+    // #[cfg(target_os = "macos")]
+    // {
+    //     println!("Because you're on MacOS, the Video Player sadly cannot run on another thread. You need to quit it to continue!");
+    //     tauri::Builder::default()
+    //         .invoke_handler(tauri::generate_handler!(tauri_handler))
+    //         .run(tauri::generate_context!())
+    //         .expect("error while running tauri application");
+    // }
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    {
+        std::thread::spawn(|| {
+            tauri::Builder::default()
+                .any_thread()
+                .invoke_handler(tauri::generate_handler!(tauri_handler))
+                .run(tauri::generate_context!())
+                .expect("error while running tauri application");
+        });
+    }
+
     let _ = notify_rust::Notification::new()
         .summary("Do you want to subscribe to our mailing list?")
         .body("Shoot an email to gian.zellweger@ict-scouts.ch and you will automatically be added to the mailing list!")
@@ -257,6 +390,7 @@ fn sillyness(save_data: &mut SaveData) {
     if !has_internet {
         report_error("To use this programming language, you need an internet connection!".to_string());
     }
+
     if fastrand::f64() <= CHANCE_OF_SERVER_MAINTAINANCE {
         report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!".to_string());
     }
@@ -264,6 +398,27 @@ fn sillyness(save_data: &mut SaveData) {
     let random_advertisement: Advertisement = rand::random();
 
     println!("{}", random_advertisement.to_string().yellow().on_purple().bold());
+
+    let accepted_cookies = match inquire::Select::new("This programming language uses cookies.", vec!["Accept all", "Customize"])
+        .without_help_message()
+        .prompt()
+        .expect("What")
+    {
+        "Customize" => inquire::MultiSelect::new("Select the kind of cookies you want", TYPES_OF_COOKIES.to_vec())
+            .without_help_message()
+            .with_default((0..25).collect::<Vec<_>>().as_slice())
+            .prompt()
+            .expect("No"),
+        _ => TYPES_OF_COOKIES.to_vec(),
+    };
+    if !accepted_cookies.is_empty() {
+        println!("The types of cookies you accepted are:");
+        for cookie in accepted_cookies {
+            println!("- {}", cookie);
+        }
+    }
+
+    println!();
 
     let argon2 = Argon2::default();
 
@@ -275,7 +430,7 @@ fn sillyness(save_data: &mut SaveData) {
     .prompt()
     .expect("What")
     {
-        x if x == SECOND_OPTION => {
+        SECOND_OPTION => {
             let name = inquire::Text::new("Enter your name: ")
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(16))
@@ -309,10 +464,41 @@ fn sillyness(save_data: &mut SaveData) {
             }
             let salt = SaltString::generate(&mut OsRng);
             let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
-            save_data.account = Some(Account { name, password_hash });
+
+            let ga = google_authenticator::GoogleAuthenticator::new();
+            let secret = ga.create_secret(32);
+            let qr_code_url = ga.qr_code_url(secret.as_str(), name.as_str(), "Badlang™", 500, 500, google_authenticator::ErrorCorrectionLevel::High);
+            let _ = open::that(qr_code_url);
+
+            print!("A QR-code with your Google Authenticator code just opened in your browser. Do scan it, because it will never ever be available again! Press enter as soon as you're ready ");
+            let _ = std::io::stdout().flush();
+            {
+                let mut buffer = String::new();
+                let stdin = std::io::stdin();
+                let _ = stdin.read_line(&mut buffer);
+            }
+
+            let _ = inquire::Text::new(TERMS_OF_SERVICE)
+                .with_validator(|v: &str| {
+                    if v == ACCEPTANCE_PHRASE {
+                        Ok(Validation::Valid)
+                    } else if v == ACCEPTANCE_PHRASE.replace(' ', " ") {
+                        Ok(Validation::Invalid("You can't just copy-paste and expect it to work!".into()))
+                    } else {
+                        Ok(Validation::Invalid("Incorrect text!".into()))
+                    }
+                })
+                .prompt();
+
+            save_data.account = Some(Account {
+                name,
+                password_hash,
+                version: semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string(),
+                google_auth_secret: secret,
+            });
             println!("{}! Account saved!", "SUCCESS".green());
         }
-        x if x == FIRST_OPTION => {
+        FIRST_OPTION => {
             if save_data.account.is_none() {
                 report_error("You do infact not have an account".to_string());
             }
@@ -331,34 +517,101 @@ fn sillyness(save_data: &mut SaveData) {
                 .prompt()
                 .expect("Enter a password");
 
+            let confirm_signs = ["✅", "✅", "✔️", "✓", "✔"];
+            let cancel_signs = [
+                "𝕏", "✗", "✘", "×", "Χ", "χ", "Х", "х", "╳", "☓", "✕", "✖", "❌", "❎", "⨉", "⨯", "🗙", "🗴", "🞨", "🞩", "🞪", "🞫", "🞬", "🞭", "🞮",
+            ];
+            let bool_formatter: inquire::formatter::BoolFormatter = &|boolean| match boolean {
+                true => confirm_signs.as_slice().join("/"),
+                false => cancel_signs.as_slice().join("/"),
+            };
+            let bool_parser: inquire::parser::BoolParser = &|string| {
+                if confirm_signs.as_slice().contains(&string) {
+                    Ok(true)
+                } else if cancel_signs.as_slice().contains(&string) {
+                    Ok(false)
+                } else {
+                    Err(())
+                }
+            };
+            // I want to draw your attention to the fact that this does infact do
+            // nothing at all, like so many checkboxes of this type
+            let _ = inquire::Confirm::new("Remember password?")
+                .with_formatter(bool_formatter)
+                .with_parser(bool_parser)
+                .with_error_message(
+                    format!(
+                        "Type one of {} to accept and one of {} to decline",
+                        confirm_signs.as_slice().join("/"),
+                        cancel_signs.as_slice().join("/")
+                    )
+                    .as_str(),
+                )
+                .prompt();
+
             let parsed_hash = PasswordHash::new(&account.password_hash).expect("Oh no");
-            if name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok() {
-                println!("{}! Logged in successfully", "SUCCESS".green());
-            } else {
+            if !(name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok()) {
                 report_error("Either your name or password were wrong. Try again!".to_string());
             }
+
+            let auth_code = inquire::Text::new("Enter your Google Authenticator code:")
+                .with_validator(inquire::required!())
+                .with_validator(inquire::length!(6))
+                .prompt()
+                .expect("Enter your auth code");
+
+            let ga = google_authenticator::GoogleAuthenticator::new();
+
+            if !ga.verify_code(save_data.account.as_ref().unwrap().google_auth_secret.as_str(), auth_code.as_str(), 0, 0) {
+                report_error("Your auth code was wrong!".to_string());
+            }
+
+            println!("{}! Logged into your account!", "SUCCESS".green().bold());
         }
         _ => unreachable!(),
     }
 
     if SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs() - save_data.last_update > (24 * 60 * 60) {
-        // if true { // This is for testing. Remove it or don't
+        // These are for testing because this part of the code likes to break.
+        // if false {
+        // if true {
         let update_size = fastrand::u64((UPDATE_SIZE - UPDATE_VARIATION)..(UPDATE_SIZE + UPDATE_VARIATION));
         let (download_time, content_length) = {
             let start = Instant::now();
-            let content_length = match reqwest::blocking::get(TEST_FILE.0) {
-                Ok(ok) => {
-                    let content_length = ok.content_length().unwrap_or(TEST_FILE.1);
-                    print!("{}", ok.text().unwrap_or("".to_string())); // This print is stupid because it shouldn't need to be here. It just won't
-                                                                       // measure any download speed otherwise and since the file is "empty" it
-                                                                       // doesn't actually print anything. But I'm leaving it here because I feel
-                                                                       // it fits with the feel of the program
-                    content_length
-                }
-                Err(err) => report_error(format!("Couldn't download update because {err}")),
-            };
+            let mut content_length: isize = -1;
+            for test_file in TEST_FILE {
+                content_length = match reqwest::blocking::get(test_file.0) {
+                    Ok(ok) => {
+                        if ok.status().is_server_error() {
+                            continue;
+                            // report_error(format!(
+                            //     "Couldn't download update because the
+                            // servers are having a bad day and want to let
+                            // you know that {}",
+                            //     ok.status()
+                            // )); // This is an actual server outage, not
+                            // a fake one
+                        }
+                        let temp = ok.content_length().unwrap_or(test_file.1) as isize;
+                        let _ = std::fs::write("/dev/null", ok.text().unwrap_or("".to_string())); // This write is stupid because it shouldn't need to be here. It just won't
+                                                                                                  // measure any download speed otherwise and since the file is "empty" it
+                                                                                                  // doesn't actually print anything. But I'm leaving it here because I feel
+                                                                                                  // it fits with the feel of the program
+                        temp
+                    }
+                    Err(_err) => {
+                        continue;
+                        // report_error(format!("Couldn't download update
+                        // because {err}"));
+                    }
+                };
+                break;
+            }
             (start.elapsed(), content_length)
         };
+        if content_length == -1 {
+            report_error("There is an actual server error. For real this time".to_string());
+        }
         let download_speed = content_length as f64 / download_time.as_secs_f64();
         let mut progress = 0;
         let progress_bar = indicatif::ProgressBar::new(update_size);
@@ -413,8 +666,23 @@ fn main() {
     savefile_path.push("badlang");
     savefile_path.push("badlang.bin");
 
-    let mut save_data = match load_file(&savefile_path, 0) {
-        Ok(sd) => sd,
+    let mut save_data = match load_file::<SaveData, &PathBuf>(&savefile_path, 0) {
+        Ok(sd) => {
+            if sd
+                .account
+                .as_ref()
+                .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
+            {
+                sd
+            } else {
+                report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one".to_string());
+                SaveData {
+                    account:     None,
+                    runs_so_far: 0,
+                    last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
+                }
+            }
+        }
         Err(_) => SaveData {
             account:     None,
             runs_so_far: 0,
