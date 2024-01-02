@@ -19,8 +19,15 @@ jobs:
     #    - name: Build
     #      run: cargo build
 
-    windows_build:
-        runs-on: windows-latest
+    #windows_build:
+    #    runs-on: windows-latest
+    #    steps:
+    #    - uses: actions/checkout@v3
+    #    - name: Build
+    #      run: cargo build
+
+    macos_build:
+        runs-on: macos-latest
         steps:
         - uses: actions/checkout@v3
         - name: Build
