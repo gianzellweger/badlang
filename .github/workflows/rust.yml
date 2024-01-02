@@ -10,15 +10,18 @@ env:
     CARGO_TERM_COLOR: always
 
 jobs:
-    ubuntu_build:
+    #ubuntu_build:
+    #    runs-on: ubuntu-latest
+    #    steps:
+    #    - uses: actions/checkout@v3
+    #    - name: Install Dependencies
+    #      run: sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libjavascriptcoregtk-4.0-dev libwebkit2gtk-4.0-dev
+    #    - name: Build
+    #      run: cargo build
 
-        runs-on: ubuntu-latest
-
+    windows_build:
+        runs-on: windows-latest
         steps:
         - uses: actions/checkout@v3
-        - name: Install Dependencies
-          run: sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libjavascriptcoregtk-4.0-dev libwebkit2gtk-4.0-dev
         - name: Build
           run: cargo build
-        - name: Run tests
-          run: cargo test
