@@ -13,7 +13,6 @@ use argon2::{
 };
 use clap::Parser;
 use colored::Colorize;
-use enigo::MouseControllable;
 use geocoding::Reverse;
 use inquire::validator::Validation;
 use rand::distributions::Distribution;
@@ -175,7 +174,7 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
 - Show an ad for an "evil" megacorporation before the program runs.
 - Cookies
 - TOS
-x Random popup video
+- Random popup video
 - The actual funny thing about this entire project is the absolute dependency spam because of all the useless tomfoolery (It is absolutly intended that the program uses two different rng crates for example)
 
 */
@@ -230,8 +229,13 @@ fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), Stri
     static VELOCITY: Mutex<(i32, i32)> = Mutex::new((20, 20));
     static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
 
-    let enigo = enigo::Enigo::new();
-    let (screen_x, screen_y) = enigo.main_display_size();
+    let mut size = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .map(|monitor| monitor.position())
+        .map(|pos| (pos.x, pos.y))
+        .unwrap_or((1920, 1080));
     let mut position = POSITION.lock().unwrap();
     let mut velocity = VELOCITY.lock().unwrap();
     if position.0 > screen_x || position.0 < 0 {
@@ -360,7 +364,8 @@ const SECOND_OPTION: &str = "No, proceed to signup";
 fn sillyness(save_data: &mut SaveData) {
     // #[cfg(target_os = "macos")]
     // {
-    //     println!("Because you're on MacOS, the Video Player sadly cannot run on another thread. You need to quit it to continue!");
+    //     println!("Because you're on MacOS, the Video Player sadly cannot run
+    // on another thread. You need to quit it to continue!");
     //     tauri::Builder::default()
     //         .invoke_handler(tauri::generate_handler!(tauri_handler))
     //         .run(tauri::generate_context!())
