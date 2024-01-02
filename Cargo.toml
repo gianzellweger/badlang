@@ -20,7 +20,6 @@ tauri-build = "1.5.1"
 argon2 = "0.5.2"
 clap = { version = "4.4.3", features = ["derive"] }
 colored = "2.0.4"
-enigo = "0.1.3"
 fastrand = "2.0.0"
 geocoding = "0.4.0"
 geolocation = "0.2.1"
