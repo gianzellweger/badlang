@@ -229,13 +229,14 @@ fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), Stri
     static VELOCITY: Mutex<(i32, i32)> = Mutex::new((20, 20));
     static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
 
-    let mut size = window
+    let (screen_x, screen_y) = window
         .current_monitor()
         .ok()
         .flatten()
-        .map(|monitor| monitor.position())
-        .map(|pos| (pos.x, pos.y))
+        .map(|monitor| monitor.size().clone())
+        .map(|pos| (pos.height as i32, pos.width as i32))
         .unwrap_or((1920, 1080));
+
     let mut position = POSITION.lock().unwrap();
     let mut velocity = VELOCITY.lock().unwrap();
     if position.0 > screen_x || position.0 < 0 {
