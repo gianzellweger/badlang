@@ -14,5 +14,7 @@ jobs:
 
         steps:
         - uses: actions/checkout@v3
+        - name: Login
+          run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
         - name: Deploy
           run: cargo publish
