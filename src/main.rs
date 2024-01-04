@@ -1,9 +1,9 @@
+#![feature(let_chains)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
     io::Write,
     path::PathBuf,
-    sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -11,7 +11,6 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use clap::Parser;
 use colored::Colorize;
 use geocoding::Reverse;
 use inquire::validator::Validation;
@@ -23,16 +22,6 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 #[macro_use]
 extern crate savefile_derive;
 
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// File to run
-    file:      Option<PathBuf>,
-    /// Open the subscription plans in a browser
-    #[arg(short, long)]
-    subscribe: bool,
-}
-
 fn report_error(string: String) -> ! {
     eprintln!("{}: {string}", "ERROR".bold().red());
     std::process::exit(1);
@@ -42,15 +31,35 @@ fn report_warning(string: String) {
     eprintln!("{}: {string}", "WARNING".bold().yellow());
 }
 
+#[derive(EnumCountMacro, Copy, Clone, Eq, PartialEq)]
 enum Token {
-    Number(u32),
+    /// Just a fucking number
+    Number(i32),
+    /// Addition. Often used to add numbers
     Add,
+    /// Subtraction. Nothin' more, Nothin' less.
+    Subtract,
+    /// Multiplication. Very similar to multiplication.
+    Multiply,
+    /// Division. Quoted in famous works such as "Math".
+    Divide,
+    /// Used to duplicate things, much like mitosis. a -- a a
     Dup,
+    /// Drops the thing, much like I drop depth charges at 55°16'06.9"S
+    /// 13°06'37.3"W (for legal reasons, this is a joke). a --
     Drop,
+    /// Swaps the two things, much like the process of nurses swapping
+    /// babies in hospitals. a b -- b a
     Swap,
+    /// Lets the thing jump over. No good jokes here. a b -- a b a
     Over,
+    /// Rotates three things, much like my testicules. a b c -- b c a
     Rot,
+    /// Prints the character with the corresponding Unicode code point,
+    /// much like the putc() C function (well except for the Unicode part).
     Print,
+    /// Does absolutly nothing, much like this programming language.
+    Dummy,
 }
 
 fn parse_file(path: &PathBuf) -> Vec<Token> {
@@ -61,25 +70,39 @@ fn parse_file(path: &PathBuf) -> Vec<Token> {
         }
     };
     let mut tokens = Vec::new();
+    let mut is_commenting = false;
     for token in contents.split_whitespace() {
-        tokens.push(match token {
-            "+" => Token::Add,
-            "dup" => Token::Dup,
-            "drop" => Token::Drop,
-            "swap" => Token::Swap,
-            "over" => Token::Over,
-            "rot" => Token::Rot,
-            "print" => Token::Print,
-            x if x.parse::<u32>().is_ok() => Token::Number(x.parse().unwrap()),
-            unrecognized => {
-                report_error(format!("Unrecognized token {unrecognized}"));
-            }
-        })
+        if !is_commenting {
+            static_assertions::const_assert_eq!(Token::COUNT, 12);
+            tokens.push(match token {
+                "+" => Token::Add,
+                "-" => Token::Subtract,
+                "*" => Token::Multiply,
+                "/" => Token::Divide,
+                "dup" => Token::Dup,
+                "drop" => Token::Drop,
+                "swap" => Token::Swap,
+                "over" => Token::Over,
+                "rot" => Token::Rot,
+                "print" => Token::Print,
+                "coment" => {
+                    is_commenting = true;
+                    Token::Dummy // This will just chill in the token
+                }
+                x if x.parse::<i32>().is_ok() => Token::Number(x.parse().unwrap()),
+                unrecognized => {
+                    report_error(format!("Unrecognized token {unrecognized}"));
+                }
+            });
+        }
+        if token == "no_coment" {
+            is_commenting = false;
+        }
     }
     tokens
 }
 
-fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
+fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
     if out_of_free_runs {
         let local_ip = local_ip_address::local_ip().expect("I'm so done").to_string();
         let info = geolocation::find(local_ip.as_str()).expect("What");
@@ -92,12 +115,16 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
-    let mut stack: Vec<u32> = Vec::new();
+
+    let mut stack: Vec<i32> = Vec::new();
+    let mut stdout = std::io::stdout();
     for token in tokens {
         if out_of_free_runs {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
+        static_assertions::const_assert_eq!(Token::COUNT, 12);
         match token {
+            Token::Dummy => {}
             Token::Number(x) => stack.push(*x),
             Token::Add => {
                 if stack.len() < 2 {
@@ -106,6 +133,30 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a + b);
+            }
+            Token::Subtract => {
+                if stack.len() < 2 {
+                    report_error("The stack must contain at least two elements for a subtraction to be made".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(b - a);
+            }
+            Token::Multiply => {
+                if stack.len() < 2 {
+                    report_error("The stack must contain at least two elements for a multiplication to be made".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(a * b);
+            }
+            Token::Divide => {
+                if stack.len() < 2 {
+                    report_error("The stack must contain at least two elements for a division to be made".to_string());
+                }
+                let a = stack.pop().unwrap();
+                let b = stack.pop().unwrap();
+                stack.push(b / a);
             }
             Token::Dup => {
                 if stack.is_empty() {
@@ -153,10 +204,20 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) {
                 if stack.is_empty() {
                     report_error("The stack must contain at least one element for it to be printed".to_string());
                 }
-                println!("{}", stack.pop().unwrap())
+                if let Some(stack_last_u32) = stack.pop().unwrap().try_into().ok()
+                    && let Some(chr) = char::from_u32(stack_last_u32)
+                {
+                    print!("{chr}");
+                    match stdout.flush() {
+                        Ok(()) => {}
+                        Err(err) => report_error(format!("Couldn't flush stdout because apparently {err}")),
+                    }
+                }
             }
         }
     }
+    println!();
+    stack
 }
 
 // This part of the program serves absolutly no reason is just here because
@@ -224,16 +285,17 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 #[tauri::command]
 fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), String> {
-    static VELOCITY: Mutex<(i32, i32)> = Mutex::new((20, 20));
-    static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
+    static VELOCITY: std::sync::Mutex<(i32, i32)> = Mutex::new((20, 20));
+    static POSITION: std::sync::Mutex<(i32, i32)> = Mutex::new((0, 0));
 
     let (screen_x, screen_y) = window
         .current_monitor()
         .ok()
         .flatten()
-        .map(|monitor| monitor.size().clone())
+        .map(|monitor| *monitor.size())
         .map(|pos| (pos.height as i32, pos.width as i32))
         .unwrap_or((1920, 1080));
 
@@ -437,7 +499,7 @@ fn sillyness(save_data: &mut SaveData) {
     .expect("What")
     {
         SECOND_OPTION => {
-            let name = inquire::Text::new("Enter your name: ")
+            let name = inquire::Text::new("Enter your username: ")
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(16))
                 .prompt()
@@ -590,13 +652,6 @@ fn sillyness(save_data: &mut SaveData) {
                     Ok(ok) => {
                         if ok.status().is_server_error() {
                             continue;
-                            // report_error(format!(
-                            //     "Couldn't download update because the
-                            // servers are having a bad day and want to let
-                            // you know that {}",
-                            //     ok.status()
-                            // )); // This is an actual server outage, not
-                            // a fake one
                         }
                         let temp = ok.content_length().unwrap_or(test_file.1) as isize;
                         let _ = std::fs::write("/dev/null", ok.text().unwrap_or("".to_string())); // This write is stupid because it shouldn't need to be here. It just won't
@@ -607,8 +662,6 @@ fn sillyness(save_data: &mut SaveData) {
                     }
                     Err(_err) => {
                         continue;
-                        // report_error(format!("Couldn't download update
-                        // because {err}"));
                     }
                 };
                 break;
@@ -667,6 +720,28 @@ fn sillyness(save_data: &mut SaveData) {
 // The silly part is over. Thank god
 
 fn main() {
+    let matches = clap::command!()
+        .arg(clap::arg!(<file> "The file to run").required(false).value_parser(clap::value_parser!(PathBuf))) // Yes it is required but it kinda isn't because subscribe.
+        .arg(
+            clap::arg!(-s --subscribe "Open the subscription plans in a browser")
+                .required(false)
+                .value_parser(clap::value_parser!(bool)),
+        )
+        .arg(clap::arg!(--notroll).hide(true).required(false).value_parser(clap::value_parser!(bool))) // This argument isn't really needed and potentially defeats the purpose of the program but it is here so I can keep my sanity.
+        .get_matches();
+
+    let tokens = match matches.get_one::<PathBuf>("file") {
+        Some(path) => parse_file(path),
+        None => report_error("Please provide a path to run!".to_string()),
+    };
+
+    if let Some(no_troll) = matches.get_one::<bool>("notroll")
+        && *no_troll
+    {
+        execute_tokens(&tokens, false);
+        return;
+    }
+
     let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
     savefile_path.push(".config");
     savefile_path.push("badlang");
@@ -681,7 +756,7 @@ fn main() {
             {
                 sd
             } else {
-                report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one".to_string());
+                report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.".to_string());
                 SaveData {
                     account:     None,
                     runs_so_far: 0,
@@ -696,8 +771,9 @@ fn main() {
         },
     };
 
-    let args = Args::parse();
-    if args.subscribe {
+    if let Some(subscribe) = matches.get_one::<bool>("subscribe")
+        && *subscribe
+    {
         let _ = open::that("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
         report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/".to_string());
     }
@@ -712,10 +788,58 @@ fn main() {
 
     save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
 
-    let tokens = match args.file {
-        Some(path) => parse_file(&path),
+    let tokens = match matches.get_one::<PathBuf>("file") {
+        Some(path) => parse_file(path),
         None => report_error("Please provide a path to run!".to_string()),
     };
 
     execute_tokens(&tokens, save_data.runs_so_far >= FREE_RUNS);
+}
+
+// Because I hate code splitting (not really, it just doesn't fit the feel
+// of the project), tests also go in this file
+mod tests {
+    #[test]
+    fn test_math() {
+        use crate::Token as T;
+        let tokens = vec![
+            T::Number(10),
+            T::Number(5),
+            T::Add,
+            T::Number(10),
+            T::Number(5),
+            T::Subtract,
+            T::Number(10),
+            T::Number(5),
+            T::Multiply,
+            T::Number(10),
+            T::Number(5),
+            T::Divide,
+        ];
+        let stack = crate::execute_tokens(&tokens, false);
+        assert!(stack.get(0).is_some_and(|v| *v == 15));
+        assert!(stack.get(1).is_some_and(|v| *v == 5));
+        assert!(stack.get(2).is_some_and(|v| *v == 50));
+        assert!(stack.get(3).is_some_and(|v| *v == 2));
+    }
+
+    #[test]
+    fn test_stack_manip() {
+        use crate::Token as T;
+        let tokens = vec![
+            T::Number(1),
+            T::Number(2),
+            T::Number(3), // 1 2 3
+            T::Swap,      // 1 3 2
+            T::Over,      // 1 3 2 3
+            T::Dup,       // 1 3 2 3 3
+            T::Rot,       // 1 3 3 3 2
+        ];
+        let stack = crate::execute_tokens(&tokens, false);
+        assert!(stack.get(0).is_some_and(|v| *v == 1));
+        assert!(stack.get(1).is_some_and(|v| *v == 3));
+        assert!(stack.get(2).is_some_and(|v| *v == 3));
+        assert!(stack.get(3).is_some_and(|v| *v == 3));
+        assert!(stack.get(4).is_some_and(|v| *v == 2));
+    }
 }
