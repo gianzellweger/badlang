@@ -288,8 +288,8 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 #[tauri::command]
 fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), String> {
-    static VELOCITY: std::sync::Mutex<(i32, i32)> = Mutex::new((20, 20));
-    static POSITION: std::sync::Mutex<(i32, i32)> = Mutex::new((0, 0));
+    static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((20, 20));
+    static POSITION: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((0, 0));
 
     let (screen_x, screen_y) = window
         .current_monitor()
