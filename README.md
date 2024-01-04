@@ -20,7 +20,7 @@ This revolutionary blazingly fast example shows the grace of stack-based program
 
 ### Hello world
 
-There is no Hello World in BadLang™. Why would you want such an inefficient program that does nothing?
+See [this file](https://github.com/gianzellweger/badlang/blob/release/examples/hello.bl).
 
 ---
 
@@ -39,7 +39,7 @@ Or with three numbers:
 
 ### Comments
 
-There are no comments in BadLang™. All code written in Badlang™ is self-documenting.
+You can start a comment using `coment` and stop it using `no_coment`.
 
 ## Contributing
 

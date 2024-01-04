@@ -1,6 +1,6 @@
 [package]
 name = "badlang"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Gian Zellweger <gian.zellweger@ict-scouts.ch"]
 rust-version = "1.72.0"
 description = "Next generation stack-based programming language"
@@ -18,7 +18,7 @@ tauri-build = "1.5.1"
 
 [dependencies]
 argon2 = "0.5.2"
-clap = { version = "4.4.3", features = ["derive"] }
+clap = { version = "4.4.3", features = ["derive", "cargo"] }
 colored = "2.0.4"
 fastrand = "2.0.0"
 geocoding = "0.4.0"
