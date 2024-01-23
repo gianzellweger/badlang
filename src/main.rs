@@ -451,7 +451,7 @@ fn sillyness(save_data: &mut SaveData) {
 
     let _ = notify_rust::Notification::new()
         .summary("Do you want to subscribe to our mailing list?")
-        .body("Shoot an email to gian.zellweger@ict-scouts.ch and you will automatically be added to the mailing list!")
+        .body("Shoot an email to mailinglist@badlang.dev and you will automatically be added to the mailing list!")
         .appname("Mailing List Subscriber")
         .auto_icon()
         .sound_name("alarm-clock-elapsed")
