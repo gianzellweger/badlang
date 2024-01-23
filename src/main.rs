@@ -23,8 +23,7 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 extern crate savefile_derive;
 
 fn report_error(string: String) -> ! {
-    eprintln!("{}: {string}", "ERROR".bold().red());
-    std::process::exit(1);
+    panic!("{}: {string}", "ERROR".bold().red());
 }
 
 fn report_warning(string: String) {
@@ -440,8 +439,14 @@ fn sillyness(save_data: &mut SaveData) {
             tauri::Builder::default()
                 .any_thread()
                 .invoke_handler(tauri::generate_handler!(tauri_handler))
-                .run(tauri::generate_context!())
-                .expect("error while running tauri application");
+                .build(tauri::generate_context!())
+                .expect("error while building tauri application")
+                .run(|_app_handle, event| match event {
+                    tauri::RunEvent::ExitRequested { api, .. } => {
+                        api.prevent_exit();
+                    }
+                    _ => {}
+                });
         });
     }
 
@@ -730,47 +735,6 @@ fn main() {
         .arg(clap::arg!(--notroll).hide(true).required(false).value_parser(clap::value_parser!(bool))) // This argument isn't really needed and potentially defeats the purpose of the program but it is here so I can keep my sanity.
         .get_matches();
 
-    let tokens = match matches.get_one::<PathBuf>("file") {
-        Some(path) => parse_file(path),
-        None => report_error("Please provide a path to run!".to_string()),
-    };
-
-    if let Some(no_troll) = matches.get_one::<bool>("notroll")
-        && *no_troll
-    {
-        execute_tokens(&tokens, false);
-        return;
-    }
-
-    let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
-    savefile_path.push(".config");
-    savefile_path.push("badlang");
-    savefile_path.push("badlang.bin");
-
-    let mut save_data = match load_file::<SaveData, &PathBuf>(&savefile_path, 0) {
-        Ok(sd) => {
-            if sd
-                .account
-                .as_ref()
-                .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
-            {
-                sd
-            } else {
-                report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.".to_string());
-                SaveData {
-                    account:     None,
-                    runs_so_far: 0,
-                    last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
-                }
-            }
-        }
-        Err(_) => SaveData {
-            account:     None,
-            runs_so_far: 0,
-            last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
-        },
-    };
-
     if let Some(subscribe) = matches.get_one::<bool>("subscribe")
         && *subscribe
     {
@@ -778,22 +742,59 @@ fn main() {
         report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/".to_string());
     }
 
-    sillyness(&mut save_data);
+    let out_of_free_runs = if let Some(no_troll) = matches.get_one::<bool>("notroll")
+        && !(*no_troll)
+    {
+        let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
+        savefile_path.push(".config");
+        savefile_path.push("badlang");
+        savefile_path.push("badlang.bin");
 
-    if let Some(parent_dir) = savefile_path.parent() {
-        if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
-            report_error(format!("Couldn't create savefile because {err}"));
+        let mut save_data = match load_file::<SaveData, &PathBuf>(&savefile_path, 0) {
+            Ok(sd) => {
+                if sd
+                    .account
+                    .as_ref()
+                    .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
+                {
+                    sd
+                } else {
+                    report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.".to_string());
+                    SaveData {
+                        account:     None,
+                        runs_so_far: 0,
+                        last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
+                    }
+                }
+            }
+            Err(_) => SaveData {
+                account:     None,
+                runs_so_far: 0,
+                last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
+            },
+        };
+
+        sillyness(&mut save_data);
+
+        if let Some(parent_dir) = savefile_path.parent() {
+            if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
+                report_error(format!("Couldn't create savefile because {err}"));
+            }
         }
-    }
 
-    save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
+        save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
+
+        save_data.runs_so_far >= FREE_RUNS
+    } else {
+        false
+    };
 
     let tokens = match matches.get_one::<PathBuf>("file") {
         Some(path) => parse_file(path),
         None => report_error("Please provide a path to run!".to_string()),
     };
 
-    execute_tokens(&tokens, save_data.runs_so_far >= FREE_RUNS);
+    execute_tokens(&tokens, out_of_free_runs);
 }
 
 // Because I hate code splitting (not really, it just doesn't fit the feel
