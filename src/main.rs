@@ -441,11 +441,10 @@ fn sillyness(save_data: &mut SaveData) {
                 .invoke_handler(tauri::generate_handler!(tauri_handler))
                 .build(tauri::generate_context!())
                 .expect("error while building tauri application")
-                .run(|_app_handle, event| match event {
-                    tauri::RunEvent::ExitRequested { api, .. } => {
+                .run(|_app_handle, event| {
+                    if let tauri::RunEvent::ExitRequested { api, .. } = event {
                         api.prevent_exit();
                     }
-                    _ => {}
                 });
         });
     }
