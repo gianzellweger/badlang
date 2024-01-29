@@ -224,9 +224,7 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
 // This part of the program serves absolutely no reason is just here
 // because I find it incredibly funny.
 
-// List of "features" and a roadmap
-// https://github.com/gianzellweger/badlang/issues/3
-//
+// List of "features" and a roadmap can be found at https://github.com/gianzellweger/badlang/issues/3
 
 #[derive(EnumCountMacro, Debug, PartialEq, Eq)]
 enum Advertisement {
@@ -510,21 +508,18 @@ fn sillyness(save_data: &mut SaveData) {
                 .expect("Enter your name");
 
             let password = inquire::Password::new("Enter your password: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
                 .prompt()
                 .expect("Enter a password");
             let password_repetition = inquire::Password::new("Repeat your password: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
                 .prompt()
                 .expect("Enter a password");
             let password_repetition2 = inquire::Password::new("Repeat your password again: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
@@ -550,7 +545,7 @@ fn sillyness(save_data: &mut SaveData) {
                 let _ = stdin.read_line(&mut buffer);
             }
 
-            let _ = inquire::Text::new(TERMS_OF_SERVICE)
+            inquire::Text::new(TERMS_OF_SERVICE)
                 .with_validator(|v: &str| {
                     if v == ACCEPTANCE_PHRASE {
                         Ok(Validation::Valid)
@@ -560,7 +555,8 @@ fn sillyness(save_data: &mut SaveData) {
                         Ok(Validation::Invalid("Incorrect text!".into()))
                     }
                 })
-                .prompt();
+                .prompt()
+                .expect("Enter the phrase");
 
             save_data.account = Some(Account {
                 name,
@@ -582,7 +578,6 @@ fn sillyness(save_data: &mut SaveData) {
                 .expect("Enter your name");
 
             let password = inquire::Password::new("Enter your password: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
