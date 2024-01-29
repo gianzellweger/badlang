@@ -441,18 +441,17 @@ fn sillyness(save_data: &mut SaveData) {
                 .invoke_handler(tauri::generate_handler!(tauri_handler))
                 .build(tauri::generate_context!())
                 .expect("error while building tauri application")
-                .run(|_app_handle, event| match event {
-                    tauri::RunEvent::ExitRequested { api, .. } => {
+                .run(|_app_handle, event| {
+                    if let tauri::RunEvent::ExitRequested { api, .. } = event {
                         api.prevent_exit();
                     }
-                    _ => {}
                 });
         });
     }
 
     let _ = notify_rust::Notification::new()
         .summary("Do you want to subscribe to our mailing list?")
-        .body("Shoot an email to gian.zellweger@ict-scouts.ch and you will automatically be added to the mailing list!")
+        .body("Shoot an email to mailinglist@badlang.dev and you will automatically be added to the mailing list!")
         .appname("Mailing List Subscriber")
         .auto_icon()
         .sound_name("alarm-clock-elapsed")
