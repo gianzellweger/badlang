@@ -19,7 +19,7 @@ use inquire::validator::Validation;
 use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
-use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
+use strum_macros::EnumCount as EnumCountMacro;
 
 #[macro_use]
 extern crate savefile_derive;
@@ -221,27 +221,14 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
     stack
 }
 
-// This part of the program serves absolutly no reason is just here because
-// I find it incredibly funny.
+// This part of the program serves absolutely no reason is just here
+// because I find it incredibly funny.
 
-/* List of "features":
+// List of "features" and a roadmap
+// https://github.com/gianzellweger/badlang/issues/3
+//
 
-- Update every day of around 1GB (size randomly determined and based on actual download speed)
-- A required account, otherwise no basic stack based language for you
-- Certain amount of free runs, afterwards only free runs on "bad server infrastructure" possible unless you have the "Pro subscription" (The program just runs with delays between instructions, no subscriptions exist)
-- The server for both of these will have a chance of having an outage.
-- Internet connection is required
-- The server location is determined based on your real location, but it is on the exact opposite side of the world (I can't get this to work right now so the servers are in Antarctica)
-- A desktop notification asking you if you want to subscribe to a mailing list that doesn't exist.
-- Show an ad for an "evil" megacorporation before the program runs.
-- Cookies
-- TOS
-- Random popup video
-- The actual funny thing about this entire project is the absolute dependency spam because of all the useless tomfoolery (It is absolutly intended that the program uses two different rng crates for example)
-
-*/
-
-#[derive(EnumCountMacro, EnumIter)]
+#[derive(EnumCountMacro, Debug, PartialEq, Eq)]
 enum Advertisement {
     Temu,
     Shein,
