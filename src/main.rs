@@ -1,6 +1,8 @@
 #![feature(let_chains)]
+#![feature(panic_backtrace_config)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use core::str;
 use std::{
     io::Write,
     path::PathBuf,
@@ -411,27 +413,38 @@ I solemnly declare that I've thoroughly read and understood th
 // character U+2002, which looks identical. This is to prevent copying.
 const ACCEPTANCE_PHRASE: &str = "I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions";
 
-const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1;
+const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1; // Also known as 10%
 
 const FREE_RUNS: usize = 5;
 
-const UPDATE_SIZE: u64 = 1_000_000_000;
-const UPDATE_VARIATION: u64 = 300_000_000;
-const DOWNLOAD_SPEED_VARIATION: f64 = 0.8;
+const UPDATE_SIZE: u64 = 1_000_000_000; // 1GB
+const UPDATE_VARIATION: u64 = 300_000_000; // 300MB
+const DOWNLOAD_SPEED_VARIATION: f64 = 0.8; // 80%
 const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
 
 const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
 
 fn sillyness(save_data: &mut SaveData) {
+    // This macos version panics for some reason currently. Will fix later
     // #[cfg(target_os = "macos")]
     // {
-    //     println!("Because you're on MacOS, the Video Player sadly cannot run
-    // on another thread. You need to quit it to continue!");
-    //     tauri::Builder::default()
+    //     println!(
+    //         "Because you're on MacOS, the Video Player sadly cannot run
+    // on another thread. You need to quit it to continue!"
+    //     );
+    //     let mut app = tauri::Builder::default()
     //         .invoke_handler(tauri::generate_handler!(tauri_handler))
-    //         .run(tauri::generate_context!())
-    //         .expect("error while running tauri application");
+    //         .build(tauri::generate_context!())
+    //         .expect("error while building tauri application");
+
+    //     loop {
+    //         let iteration = app.run_iteration();
+    //         if iteration.window_count == 0 {
+    //             tauri::api::process::kill_children();
+    //             break;
+    //         }
+    //     }
     // }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     {
@@ -724,6 +737,18 @@ fn sillyness(save_data: &mut SaveData) {
 // The silly part is over. Thank god
 
 fn main() {
+    // Using this removes lots of fluff from panic messages
+    std::panic::set_hook(Box::new(|panic_bundle| {
+        eprintln!(
+            "{}",
+            if let Some(msg) = panic_bundle.payload().downcast_ref::<String>() {
+                msg.clone()
+            } else {
+                panic_bundle.to_string()
+            }
+        );
+    }));
+
     let matches = clap::command!()
         .arg(clap::arg!(<file> "The file to run").required(false).value_parser(clap::value_parser!(PathBuf))) // Yes it is required but it kinda isn't because subscribe.
         .arg(
