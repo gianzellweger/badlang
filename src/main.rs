@@ -1,6 +1,19 @@
 #![feature(let_chains)]
+// #![feature(panic_backtrace_config)]
+#![feature(if_let_guard)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![forbid(unsafe_code)]
+#![deny(clippy::pedantic)]
+#![deny(clippy::nursery)]
+#![forbid(clippy::enum_glob_use)]
+#![forbid(clippy::unwrap_used)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::cognitive_complexity)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
+use core::str;
 use std::{
     io::Write,
     path::PathBuf,
@@ -17,16 +30,16 @@ use inquire::validator::Validation;
 use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
-use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
+use strum_macros::EnumCount as EnumCountMacro;
 
 #[macro_use]
 extern crate savefile_derive;
 
-fn report_error(string: String) -> ! {
+fn report_error(string: &str) -> ! {
     panic!("{}: {string}", "ERROR".bold().red());
 }
 
-fn report_warning(string: String) {
+fn report_warning(string: &str) {
     eprintln!("{}: {string}", "WARNING".bold().yellow());
 }
 
@@ -65,7 +78,7 @@ fn parse_file(path: &PathBuf) -> Vec<Token> {
     let contents = match std::fs::read_to_string(path) {
         Ok(string) => string,
         Err(err) => {
-            report_error(format!("File could not be read because {}", err));
+            report_error(format!("File could not be read because {err}").as_str());
         }
     };
     let mut tokens = Vec::new();
@@ -86,11 +99,11 @@ fn parse_file(path: &PathBuf) -> Vec<Token> {
                 "print" => Token::Print,
                 "coment" => {
                     is_commenting = true;
-                    Token::Dummy // This will just chill in the token
+                    Token::Dummy // This will just chill in the tokens
                 }
-                x if x.parse::<i32>().is_ok() => Token::Number(x.parse().unwrap()),
+                x if let Ok(num) = x.parse::<i32>() => Token::Number(num),
                 unrecognized => {
-                    report_error(format!("Unrecognized token {unrecognized}"));
+                    report_error(format!("Unrecognized token {unrecognized}").as_str());
                 }
             });
         }
@@ -110,7 +123,7 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
         let location = openstreetmap.reverse(&geocoding::Point::new(-longitude, 180.0 - latitude));
         println!(
             "Connecting to our servers in {}, our datacenter that is nearest to you!",
-            location.unwrap_or(Some("Antarctica".to_string())).unwrap_or("Antarctica".to_string())
+            location.unwrap_or_else(|_| Some("Antarctica".to_string())).unwrap_or_else(|| "Antarctica".to_string())
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
@@ -126,91 +139,102 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
             Token::Dummy => {}
             Token::Number(x) => stack.push(*x),
             Token::Add => {
-                if stack.len() < 2 {
-                    report_error("The stack must contain at least two elements for an addition to be made".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(a + b);
+                } else {
+                    report_error("The stack must contain at least two elements for an addition to be made");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                stack.push(a + b);
             }
             Token::Subtract => {
-                if stack.len() < 2 {
-                    report_error("The stack must contain at least two elements for a subtraction to be made".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(b - a);
+                } else {
+                    report_error("The stack must contain at least two elements for a subtraction to be made");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                stack.push(b - a);
             }
             Token::Multiply => {
-                if stack.len() < 2 {
-                    report_error("The stack must contain at least two elements for a multiplication to be made".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(a * b);
+                } else {
+                    report_error("The stack must contain at least two elements for a multiplication to be made");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                stack.push(a * b);
             }
             Token::Divide => {
-                if stack.len() < 2 {
-                    report_error("The stack must contain at least two elements for a division to be made".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(b / a);
+                } else {
+                    report_error("The stack must contain at least two elements for a division to be made");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                stack.push(b / a);
             }
             Token::Dup => {
-                if stack.is_empty() {
-                    report_error("The stack must contain at least one element for it to be duplicated".to_string());
+                if let Some(a) = stack.last() {
+                    stack.push(*a);
+                } else {
+                    report_error("The stack must contain at least one element for it to be duplicated");
                 }
-                stack.push(*stack.last().unwrap());
             }
             Token::Drop => {
                 if stack.is_empty() {
-                    report_error("The stack must contain at least one element for it to be dropped".to_string());
+                    report_error("The stack must contain at least one element for it to be dropped");
                 }
                 let _ = stack.pop();
             }
             Token::Swap => {
-                if stack.len() < 2 {
-                    report_error("The stack must contain at least two elements for them to be swapped".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(a);
+                    stack.push(b);
+                } else {
+                    report_error("The stack must contain at least two elements for them to be swapped");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                stack.push(a);
-                stack.push(b);
             }
             Token::Over => {
-                if stack.len() < 2 {
-                    report_error("The stack must contain at least two elements for them to be overed".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(b);
+                    stack.push(a);
+                    stack.push(b);
+                } else {
+                    report_error("The stack must contain at least two elements for them to be overed");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                stack.push(b);
-                stack.push(a);
-                stack.push(b);
             }
             Token::Rot => {
-                if stack.len() < 3 {
-                    report_error("The stack must contain at least three elements for them to be roted".to_string());
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                    && let Some(c) = stack.pop()
+                {
+                    stack.push(b);
+                    stack.push(a);
+                    stack.push(c);
+                } else {
+                    report_error("The stack must contain at least three elements for them to be roted");
                 }
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
-                let c = stack.pop().unwrap();
-                stack.push(b);
-                stack.push(a);
-                stack.push(c);
             }
             Token::Print => {
-                if stack.is_empty() {
-                    report_error("The stack must contain at least one element for it to be printed".to_string());
-                }
-                if let Some(stack_last_u32) = stack.pop().unwrap().try_into().ok()
-                    && let Some(chr) = char::from_u32(stack_last_u32)
-                {
-                    print!("{chr}");
-                    match stdout.flush() {
-                        Ok(()) => {}
-                        Err(err) => report_error(format!("Couldn't flush stdout because apparently {err}")),
+                if let Some(a) = stack.pop() {
+                    if let Some(stack_last_u32) = a.try_into().ok()
+                        && let Some(chr) = char::from_u32(stack_last_u32)
+                    {
+                        print!("{chr}");
+                        match stdout.flush() {
+                            Ok(()) => {}
+                            Err(err) => report_error(format!("Couldn't flush stdout because apparently {err}").as_str()),
+                        }
+                    } else {
+                        report_error("Failed to print character");
                     }
+                } else {
+                    report_error("The stack must contain at least one element for it to be printed");
                 }
             }
         }
@@ -219,27 +243,12 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
     stack
 }
 
-// This part of the program serves absolutly no reason is just here because
-// I find it incredibly funny.
+// This part of the program serves absolutely no reason is just here
+// because I find it incredibly funny.
 
-/* List of "features":
+// List of "features" and a roadmap can be found at https://github.com/gianzellweger/badlang/issues/3
 
-- Update every day of around 1GB (size randomly determined and based on actual download speed)
-- A required account, otherwise no basic stack based language for you
-- Certain amount of free runs, afterwards only free runs on "bad server infrastructure" possible unless you have the "Pro subscription" (The program just runs with delays between instructions, no subscriptions exist)
-- The server for both of these will have a chance of having an outage.
-- Internet connection is required
-- The server location is determined based on your real location, but it is on the exact opposite side of the world (I can't get this to work right now so the servers are in Antarctica)
-- A desktop notification asking you if you want to subscribe to a mailing list that doesn't exist.
-- Show an ad for an "evil" megacorporation before the program runs.
-- Cookies
-- TOS
-- Random popup video
-- The actual funny thing about this entire project is the absolute dependency spam because of all the useless tomfoolery (It is absolutly intended that the program uses two different rng crates for example)
-
-*/
-
-#[derive(EnumCountMacro, EnumIter)]
+#[derive(EnumCountMacro, Debug, PartialEq, Eq)]
 enum Advertisement {
     Temu,
     Shein,
@@ -411,27 +420,38 @@ I solemnly declare that I've thoroughly read and understood th
 // character U+2002, which looks identical. This is to prevent copying.
 const ACCEPTANCE_PHRASE: &str = "I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions";
 
-const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1;
+const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1; // Also known as 10%
 
 const FREE_RUNS: usize = 5;
 
-const UPDATE_SIZE: u64 = 1_000_000_000;
-const UPDATE_VARIATION: u64 = 300_000_000;
-const DOWNLOAD_SPEED_VARIATION: f64 = 0.8;
+const UPDATE_SIZE: u64 = 1_000_000_000; // 1GB
+const UPDATE_VARIATION: u64 = 300_000_000; // 300MB
+const DOWNLOAD_SPEED_VARIATION: f64 = 0.8; // 80%
 const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
 
 const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
 
 fn sillyness(save_data: &mut SaveData) {
+    // This macos version panics for some reason currently. Will fix later
     // #[cfg(target_os = "macos")]
     // {
-    //     println!("Because you're on MacOS, the Video Player sadly cannot run
-    // on another thread. You need to quit it to continue!");
-    //     tauri::Builder::default()
+    //     println!(
+    //         "Because you're on MacOS, the Video Player sadly cannot run
+    // on another thread. You need to quit it to continue!"
+    //     );
+    //     let mut app = tauri::Builder::default()
     //         .invoke_handler(tauri::generate_handler!(tauri_handler))
-    //         .run(tauri::generate_context!())
-    //         .expect("error while running tauri application");
+    //         .build(tauri::generate_context!())
+    //         .expect("error while building tauri application");
+
+    //     loop {
+    //         let iteration = app.run_iteration();
+    //         if iteration.window_count == 0 {
+    //             tauri::api::process::kill_children();
+    //             break;
+    //         }
+    //     }
     // }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     {
@@ -441,18 +461,17 @@ fn sillyness(save_data: &mut SaveData) {
                 .invoke_handler(tauri::generate_handler!(tauri_handler))
                 .build(tauri::generate_context!())
                 .expect("error while building tauri application")
-                .run(|_app_handle, event| match event {
-                    tauri::RunEvent::ExitRequested { api, .. } => {
+                .run(|_app_handle, event| {
+                    if let tauri::RunEvent::ExitRequested { api, .. } = event {
                         api.prevent_exit();
                     }
-                    _ => {}
                 });
         });
     }
 
     let _ = notify_rust::Notification::new()
         .summary("Do you want to subscribe to our mailing list?")
-        .body("Shoot an email to gian.zellweger@ict-scouts.ch and you will automatically be added to the mailing list!")
+        .body("Shoot an email to mailinglist@badlang.dev and you will automatically be added to the mailing list!")
         .appname("Mailing List Subscriber")
         .auto_icon()
         .sound_name("alarm-clock-elapsed")
@@ -461,11 +480,11 @@ fn sillyness(save_data: &mut SaveData) {
 
     let has_internet = reqwest::blocking::get("https://google.com").is_ok(); // Googles servers are always up so I'm using them
     if !has_internet {
-        report_error("To use this programming language, you need an internet connection!".to_string());
+        report_error("To use this programming language, you need an internet connection!");
     }
 
     if fastrand::f64() <= CHANCE_OF_SERVER_MAINTAINANCE {
-        report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!".to_string());
+        report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!");
     }
 
     let random_advertisement: Advertisement = rand::random();
@@ -487,7 +506,7 @@ fn sillyness(save_data: &mut SaveData) {
     if !accepted_cookies.is_empty() {
         println!("The types of cookies you accepted are:");
         for cookie in accepted_cookies {
-            println!("- {}", cookie);
+            println!("- {cookie}");
         }
     }
 
@@ -511,21 +530,18 @@ fn sillyness(save_data: &mut SaveData) {
                 .expect("Enter your name");
 
             let password = inquire::Password::new("Enter your password: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
                 .prompt()
                 .expect("Enter a password");
             let password_repetition = inquire::Password::new("Repeat your password: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
                 .prompt()
                 .expect("Enter a password");
             let password_repetition2 = inquire::Password::new("Repeat your password again: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
@@ -533,14 +549,15 @@ fn sillyness(save_data: &mut SaveData) {
                 .expect("Enter a password");
 
             if !(password == password_repetition && password_repetition == password_repetition2 && password == password_repetition2) {
-                report_error("Your passwords do not match!".to_string());
+                report_error("Your passwords do not match!");
             }
             let salt = SaltString::generate(&mut OsRng);
             let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
 
             let ga = google_authenticator::GoogleAuthenticator::new();
             let secret = ga.create_secret(32);
-            let qr_code_url = ga.qr_code_url(secret.as_str(), name.as_str(), "Badlang™", 500, 500, google_authenticator::ErrorCorrectionLevel::High);
+            let mut qr_code_url = ga.qr_code_url(secret.as_str(), name.as_str(), "Badlang™", 500, 500, google_authenticator::ErrorCorrectionLevel::High);
+            qr_code_url = qr_code_url.replace('|', "%7C");
             let _ = open::that(qr_code_url);
 
             print!("A QR-code with your Google Authenticator code just opened in your browser. Do scan it, because it will never ever be available again! Press enter as soon as you're ready ");
@@ -551,7 +568,7 @@ fn sillyness(save_data: &mut SaveData) {
                 let _ = stdin.read_line(&mut buffer);
             }
 
-            let _ = inquire::Text::new(TERMS_OF_SERVICE)
+            inquire::Text::new(TERMS_OF_SERVICE)
                 .with_validator(|v: &str| {
                     if v == ACCEPTANCE_PHRASE {
                         Ok(Validation::Valid)
@@ -561,7 +578,8 @@ fn sillyness(save_data: &mut SaveData) {
                         Ok(Validation::Invalid("Incorrect text!".into()))
                     }
                 })
-                .prompt();
+                .prompt()
+                .expect("Enter the phrase");
 
             save_data.account = Some(Account {
                 name,
@@ -572,10 +590,10 @@ fn sillyness(save_data: &mut SaveData) {
             println!("{}! Account saved!", "SUCCESS".green());
         }
         FIRST_OPTION => {
-            if save_data.account.is_none() {
-                report_error("You do infact not have an account".to_string());
-            }
-            let account = save_data.account.as_ref().unwrap();
+            let Some(account) = save_data.account.as_ref() else {
+                report_error("You do infact not have an account");
+            };
+
             let name = inquire::Text::new("Enter your name: ")
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(16))
@@ -583,7 +601,6 @@ fn sillyness(save_data: &mut SaveData) {
                 .expect("Enter your name");
 
             let password = inquire::Password::new("Enter your password: ")
-                .with_display_toggle_enabled()
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
@@ -594,10 +611,7 @@ fn sillyness(save_data: &mut SaveData) {
             let cancel_signs = [
                 "𝕏", "✗", "✘", "×", "Χ", "χ", "Х", "х", "╳", "☓", "✕", "✖", "❌", "❎", "⨉", "⨯", "🗙", "🗴", "🞨", "🞩", "🞪", "🞫", "🞬", "🞭", "🞮",
             ];
-            let bool_formatter: inquire::formatter::BoolFormatter = &|boolean| match boolean {
-                true => confirm_signs.as_slice().join("/"),
-                false => cancel_signs.as_slice().join("/"),
-            };
+            let bool_formatter: inquire::formatter::BoolFormatter = &|boolean| if boolean { confirm_signs.as_slice().join("/") } else { cancel_signs.as_slice().join("/") };
             let bool_parser: inquire::parser::BoolParser = &|string| {
                 if confirm_signs.as_slice().contains(&string) {
                     Ok(true)
@@ -624,7 +638,7 @@ fn sillyness(save_data: &mut SaveData) {
 
             let parsed_hash = PasswordHash::new(&account.password_hash).expect("Oh no");
             if !(name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok()) {
-                report_error("Either your name or password were wrong. Try again!".to_string());
+                report_error("Either your name or password were wrong. Try again!");
             }
 
             let auth_code = inquire::Text::new("Enter your Google Authenticator code:")
@@ -635,14 +649,22 @@ fn sillyness(save_data: &mut SaveData) {
 
             let ga = google_authenticator::GoogleAuthenticator::new();
 
-            if !ga.verify_code(save_data.account.as_ref().unwrap().google_auth_secret.as_str(), auth_code.as_str(), 0, 0) {
-                report_error("Your auth code was wrong!".to_string());
+            if !ga.verify_code(account.google_auth_secret.as_str(), auth_code.as_str(), 0, 0) {
+                report_error("Your auth code was wrong!");
             }
 
             println!("{}! Logged into your account!", "SUCCESS".green().bold());
         }
         _ => unreachable!(),
     }
+
+    println!(
+        "{}",
+        "Follow us on Instagram and Twitter @badlang_dev and be sure to also give us a Github star ⭐️⭐️⭐️⭐️⭐️"
+            .bold()
+            .green()
+            .on_magenta()
+    );
 
     if SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs() - save_data.last_update > (24 * 60 * 60) {
         // These are for testing because this part of the code likes to break.
@@ -651,18 +673,18 @@ fn sillyness(save_data: &mut SaveData) {
         let update_size = fastrand::u64((UPDATE_SIZE - UPDATE_VARIATION)..(UPDATE_SIZE + UPDATE_VARIATION));
         let (download_time, content_length) = {
             let start = Instant::now();
-            let mut content_length: isize = -1;
+            let mut content_length = u64::MAX;
             for test_file in TEST_FILE {
                 content_length = match reqwest::blocking::get(test_file.0) {
                     Ok(ok) => {
                         if ok.status().is_server_error() {
                             continue;
                         }
-                        let temp = ok.content_length().unwrap_or(test_file.1) as isize;
-                        let _ = std::fs::write("/dev/null", ok.text().unwrap_or("".to_string())); // This write is stupid because it shouldn't need to be here. It just won't
-                                                                                                  // measure any download speed otherwise and since the file is "empty" it
-                                                                                                  // doesn't actually print anything. But I'm leaving it here because I feel
-                                                                                                  // it fits with the feel of the program
+                        let temp = ok.content_length().unwrap_or(test_file.1);
+                        let _ = std::fs::write("/dev/null", ok.text().unwrap_or_else(|_| String::new())); // This write is stupid because it shouldn't need to be here. It just won't
+                                                                                                          // measure any download speed otherwise and since the file is "empty" it
+                                                                                                          // doesn't actually print anything. But I'm leaving it here because I feel
+                                                                                                          // it fits with the feel of the program
                         temp
                     }
                     Err(_err) => {
@@ -673,8 +695,8 @@ fn sillyness(save_data: &mut SaveData) {
             }
             (start.elapsed(), content_length)
         };
-        if content_length == -1 {
-            report_error("There is an actual server error. For real this time".to_string());
+        if content_length == u64::MAX {
+            report_error("There is an actual server error. For real this time");
         }
         let download_speed = content_length as f64 / download_time.as_secs_f64();
         let mut progress = 0;
@@ -693,7 +715,7 @@ fn sillyness(save_data: &mut SaveData) {
                     )
                     .as_str(),
                 )
-                .unwrap(),
+                .expect("This shouldn't fail"),
             );
             iteration += 1;
             progress_bar.inc(increment);
@@ -709,22 +731,33 @@ fn sillyness(save_data: &mut SaveData) {
     let exec_name = std::env::args().next().expect("How did you manage this one again?");
     save_data.runs_so_far += 1;
     if save_data.runs_so_far < FREE_RUNS {
-        report_warning(format!(
-            "You have used {} out of your {FREE_RUNS} free runs. Afterwards, the program will run on our bronze tier server infrastructure, unless you subscribe to either our gold or platinum \
-             subscription tier. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`",
-            save_data.runs_so_far
-        ));
+        report_warning(
+            format!(
+                "You have used {} out of your {FREE_RUNS} free runs. Afterwards, the program will run on our bronze tier server infrastructure, unless you subscribe to either our gold or platinum \
+                 subscription tier. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`",
+                save_data.runs_so_far
+            )
+            .as_str(),
+        );
     } else {
-        report_warning(format!(
-            "You have used up all your free runs and your program will now run on our bronze tier server infrastructure. Subscribe to our gold or platinum tier to run your programs on your device \
-             or on our gold tier server infrastructure. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`"
-        ))
+        report_warning(
+            format!(
+                "You have used up all your free runs and your program will now run on our bronze tier server infrastructure. Subscribe to our gold or platinum tier to run your programs on your \
+                 device or on our gold tier server infrastructure. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`"
+            )
+            .as_str(),
+        );
     }
 }
 
 // The silly part is over. Thank god
 
 fn main() {
+    // Using this removes lots of fluff from panic messages
+    std::panic::set_hook(Box::new(|panic_bundle| {
+        eprintln!("{}", panic_bundle.payload().downcast_ref::<String>().map_or_else(|| panic_bundle.to_string(), std::clone::Clone::clone));
+    }));
+
     let matches = clap::command!()
         .arg(clap::arg!(<file> "The file to run").required(false).value_parser(clap::value_parser!(PathBuf))) // Yes it is required but it kinda isn't because subscribe.
         .arg(
@@ -739,7 +772,7 @@ fn main() {
         && *subscribe
     {
         let _ = open::that("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-        report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/".to_string());
+        report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/");
     }
 
     let out_of_free_runs = if let Some(no_troll) = matches.get_one::<bool>("notroll")
@@ -759,7 +792,7 @@ fn main() {
                 {
                     sd
                 } else {
-                    report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.".to_string());
+                    report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
                     SaveData {
                         account:     None,
                         runs_so_far: 0,
@@ -778,7 +811,7 @@ fn main() {
 
         if let Some(parent_dir) = savefile_path.parent() {
             if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
-                report_error(format!("Couldn't create savefile because {err}"));
+                report_error(format!("Couldn't create savefile because {err}").as_str());
             }
         }
 
@@ -789,10 +822,7 @@ fn main() {
         false
     };
 
-    let tokens = match matches.get_one::<PathBuf>("file") {
-        Some(path) => parse_file(path),
-        None => report_error("Please provide a path to run!".to_string()),
-    };
+    let tokens = matches.get_one::<PathBuf>("file").map_or_else(|| report_error("Please provide a path to run!"), parse_file);
 
     execute_tokens(&tokens, out_of_free_runs);
 }
