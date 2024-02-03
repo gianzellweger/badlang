@@ -1,5 +1,4 @@
 #![feature(let_chains)]
-// #![feature(panic_backtrace_config)]
 #![feature(if_let_guard)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
@@ -12,6 +11,7 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_possible_wrap)]
 
 use core::str;
 use std::{
@@ -294,8 +294,9 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
+#[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
-fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), String> {
+fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
     static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((20, 20));
     static POSITION: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((0, 0));
 
@@ -304,11 +305,10 @@ fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), Stri
         .ok()
         .flatten()
         .map(|monitor| *monitor.size())
-        .map(|pos| (pos.height as i32, pos.width as i32))
-        .unwrap_or((1920, 1080));
+        .map_or((1920, 1080), |pos| (pos.height as i32, pos.width as i32));
 
-    let mut position = POSITION.lock().unwrap();
-    let mut velocity = VELOCITY.lock().unwrap();
+    let mut position = POSITION.lock().expect("Unreachable");
+    let mut velocity = VELOCITY.lock().expect("Unreachable");
     if position.0 > screen_x || position.0 < 0 {
         velocity.0 = -velocity.0;
     }
@@ -318,14 +318,15 @@ fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) -> Result<(), Stri
 
     position.0 += velocity.0;
     position.1 += velocity.1;
+    drop(velocity);
 
     let _ = window.set_position(tauri::Position::Physical((*position).into()));
+    drop(position);
 
     let _ = window.set_focus();
-    Ok(())
 }
 
-#[derive(Savefile)]
+#[derive(Savefile, Clone, Debug)]
 struct Account {
     name:               String,
     // Yes I am actually taking a programming account (that doesn't do anything) serious enough to actually use encryption.
@@ -334,11 +335,23 @@ struct Account {
     google_auth_secret: String,
 }
 
-#[derive(Savefile)]
+#[derive(Savefile, Clone, Debug)]
 struct SaveData {
-    account:     Option<Account>,
-    runs_so_far: usize,
-    last_update: u64, // This is in seconds since UNIX_EPOCH
+    account:           Option<Account>,
+    runs_so_far:       usize,
+    last_update:       u64,  // This is in seconds since UNIX_EPOCH
+    dialogs_displayed: bool, // It makes sense to display them only once per device, as this is how it works in serious applications.
+}
+
+impl Default for SaveData {
+    fn default() -> Self {
+        Self {
+            account:           None,
+            runs_so_far:       0,
+            last_update:       SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
+            dialogs_displayed: false,
+        }
+    }
 }
 
 // These files are used to measure download speed. There are multiple
@@ -455,7 +468,7 @@ fn sillyness(save_data: &mut SaveData) {
     // }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     {
-        std::thread::spawn(|| {
+        jod_thread::spawn(|| {
             tauri::Builder::default()
                 .any_thread()
                 .invoke_handler(tauri::generate_handler!(tauri_handler))
@@ -469,15 +482,6 @@ fn sillyness(save_data: &mut SaveData) {
         });
     }
 
-    let _ = notify_rust::Notification::new()
-        .summary("Do you want to subscribe to our mailing list?")
-        .body("Shoot an email to mailinglist@badlang.dev and you will automatically be added to the mailing list!")
-        .appname("Mailing List Subscriber")
-        .auto_icon()
-        .sound_name("alarm-clock-elapsed")
-        .timeout(0)
-        .show(); // This notification will not go away unless you dismiss it.
-
     let has_internet = reqwest::blocking::get("https://google.com").is_ok(); // Googles servers are always up so I'm using them
     if !has_internet {
         report_error("To use this programming language, you need an internet connection!");
@@ -486,6 +490,49 @@ fn sillyness(save_data: &mut SaveData) {
     if fastrand::f64() <= CHANCE_OF_SERVER_MAINTAINANCE {
         report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!");
     }
+
+    let save_data_clone = save_data.clone();
+    jod_thread::spawn(move || {
+        if !save_data_clone.dialogs_displayed {
+            let _ = native_dialog::MessageDialog::new()
+                .set_type(native_dialog::MessageType::Warning)
+                .set_title(r#""BadLang™" wants to access your contacts. Allow?"#)
+                .show_confirm();
+            let _ = native_dialog::MessageDialog::new()
+                .set_type(native_dialog::MessageType::Warning)
+                .set_title(r#""BadLang™" wants to access your location. Allow?"#)
+                .show_confirm();
+            let _ = native_dialog::MessageDialog::new()
+                .set_type(native_dialog::MessageType::Warning)
+                .set_title(r#""BadLang™" wants to make and receive phone calls on your behalf. Allow?"#)
+                .show_confirm();
+            let _ = native_dialog::MessageDialog::new()
+                .set_type(native_dialog::MessageType::Warning)
+                .set_title(r#""BadLang™" wants to manage incoming network connections. Allow?"#)
+                .show_confirm();
+            let _ = native_dialog::MessageDialog::new()
+                .set_type(native_dialog::MessageType::Warning)
+                .set_title(r#""BadLang™" wants to access your passwords. Allow?"#)
+                .show_confirm();
+            let _ = native_dialog::MessageDialog::new()
+                .set_type(native_dialog::MessageType::Warning)
+                .set_title(r#""BadLang™" wants to access your liver. Allow?"#)
+                .show_confirm();
+        }
+    })
+    .detach();
+    if !save_data.dialogs_displayed {
+        save_data.dialogs_displayed = true;
+    }
+
+    let _ = notify_rust::Notification::new()
+        .summary("Do you want to subscribe to our mailing list?")
+        .body("Shoot an email to mailinglist@badlang.dev and you will automatically be added to the mailing list!")
+        .appname("Mailing List Subscriber")
+        .auto_icon()
+        .sound_name("alarm-clock-elapsed")
+        .timeout(0)
+        .show(); // This notification will not go away unless you dismiss it.
 
     let random_advertisement: Advertisement = rand::random();
 
@@ -793,18 +840,10 @@ fn main() {
                     sd
                 } else {
                     report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
-                    SaveData {
-                        account:     None,
-                        runs_so_far: 0,
-                        last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
-                    }
+                    SaveData::default()
                 }
             }
-            Err(_) => SaveData {
-                account:     None,
-                runs_so_far: 0,
-                last_update: SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
-            },
+            Err(_) => SaveData::default(),
         };
 
         sillyness(&mut save_data);
