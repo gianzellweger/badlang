@@ -29,7 +29,7 @@ This revolutionary blazingly fast example shows the grace of stack-based program
 
 ### Hello world
 
-See [this file](https://github.com/gianzellweger/badlang/blob/release/examples/hello.bl).
+See [this file](./examples/hello.bl).
 
 ---
 
