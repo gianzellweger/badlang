@@ -13,7 +13,7 @@ jobs:
     ubuntu_build:
         runs-on: ubuntu-latest
         steps:
-        - uses: actions/checkout@v3
+        - uses: actions/checkout@v4
         - name: Install Dependencies
           run: sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libjavascriptcoregtk-4.0-dev libwebkit2gtk-4.0-dev
         - name: Switch to nightly
@@ -30,7 +30,7 @@ jobs:
     windows_build:
         runs-on: windows-latest
         steps:
-        - uses: actions/checkout@v3
+        - uses: actions/checkout@v4
         - name: Switch to nightly
           run: rustup default nightly
         - name: Install Clippy
@@ -45,7 +45,7 @@ jobs:
     macos_build:
         runs-on: macos-latest
         steps:
-        - uses: actions/checkout@v3
+        - uses: actions/checkout@v4
         - name: Switch to nightly
           run: rustup default nightly
         - name: Install Clippy
