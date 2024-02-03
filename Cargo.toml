@@ -1,6 +1,6 @@
 [package]
 name = "badlang"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Gian Zellweger <gian.zellweger@ict-scouts.ch"]
 rust-version = "1.72.0"
 description = "Next generation stack-based programming language"
