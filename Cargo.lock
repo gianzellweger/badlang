@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "badlang"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "argon2",
  "clap",
@@ -3663,9 +3663,9 @@ dependencies = [
 
 [[package]]
 name = "savefile"
-version = "0.16.4"
+version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9e5dc7c89e125f74cb67784646819ad63c9522aa39185f4883b6f88e825d8b7"
+checksum = "4b0066dc64379049384fd7b26358f92316e95c95a079af5c8cd02b1a1b62efd4"
 dependencies = [
  "arrayvec",
  "bit-set",
