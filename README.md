@@ -7,6 +7,10 @@
 [![Crates.io Version](https://img.shields.io/crates/v/badlang)](https://crates.io/crates/badlang)
 [![Fortnite Balls](https://img.shields.io/badge/Balls-a?logo=Rust&label=Fortnite)](https://youtu.be/dQw4w9WgXcQ)
 [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fgianzellweger%2Fbadlang%2Fbadge%3Fref%3Drelease&style=flat)](https://actions-badge.atrox.dev/gianzellweger/badlang/goto?ref=release)
+[![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/badlang_dev?style=flat&logo=twitter)](https://x.com/badlang_dev)
+[![Instagram URL](https://img.shields.io/twitter/url?url=https%3A%2F%2Finstagram.com%2Fbadlang_dev&style=flat&logo=instagram&label=Follow%20%40badlang_dev)](https://instagram.com/badlang_dev)
+
+
 
 
 <img alt="BadLang™ Logo" src="logo.png" align="right" width="100%"/>
