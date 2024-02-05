@@ -335,23 +335,12 @@ struct Account {
     google_auth_secret: String,
 }
 
-#[derive(Savefile, Clone, Debug)]
+#[derive(Savefile, Clone, Debug, Default)]
 struct SaveData {
     account:           Option<Account>,
     runs_so_far:       usize,
     last_update:       u64,  // This is in seconds since UNIX_EPOCH
     dialogs_displayed: bool, // It makes sense to display them only once per device, as this is how it works in serious applications.
-}
-
-impl Default for SaveData {
-    fn default() -> Self {
-        Self {
-            account:           None,
-            runs_so_far:       0,
-            last_update:       SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs(),
-            dialogs_displayed: false,
-        }
-    }
 }
 
 // These files are used to measure download speed. There are multiple
@@ -467,20 +456,19 @@ fn sillyness(save_data: &mut SaveData) {
     //     }
     // }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
-    {
-        jod_thread::spawn(|| {
-            tauri::Builder::default()
-                .any_thread()
-                .invoke_handler(tauri::generate_handler!(tauri_handler))
-                .build(tauri::generate_context!())
-                .expect("error while building tauri application")
-                .run(|_app_handle, event| {
-                    if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                        api.prevent_exit();
-                    }
-                });
-        });
-    }
+    jod_thread::spawn(|| {
+        tauri::Builder::default()
+            .any_thread()
+            .invoke_handler(tauri::generate_handler!(tauri_handler))
+            .build(tauri::generate_context!())
+            .expect("error while building tauri application")
+            .run(|_app_handle, event| {
+                if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                    api.prevent_exit();
+                }
+            });
+    })
+    .detach();
 
     let has_internet = reqwest::blocking::get("https://google.com").is_ok(); // Googles servers are always up so I'm using them
     if !has_internet {
@@ -496,27 +484,33 @@ fn sillyness(save_data: &mut SaveData) {
         if !save_data_clone.dialogs_displayed {
             let _ = native_dialog::MessageDialog::new()
                 .set_type(native_dialog::MessageType::Warning)
-                .set_title(r#""BadLang™" wants to access your contacts. Allow?"#)
+                .set_title("BadLang™")
+                .set_text(r#""BadLang™" wants to access your contacts. Allow?"#)
                 .show_confirm();
             let _ = native_dialog::MessageDialog::new()
                 .set_type(native_dialog::MessageType::Warning)
-                .set_title(r#""BadLang™" wants to access your location. Allow?"#)
+                .set_title("BadLang™")
+                .set_text(r#""BadLang™" wants to access your location. Allow?"#)
                 .show_confirm();
             let _ = native_dialog::MessageDialog::new()
                 .set_type(native_dialog::MessageType::Warning)
-                .set_title(r#""BadLang™" wants to make and receive phone calls on your behalf. Allow?"#)
+                .set_title("BadLang™")
+                .set_text(r#""BadLang™" wants to make and receive phone calls on your behalf. Allow?"#)
                 .show_confirm();
             let _ = native_dialog::MessageDialog::new()
                 .set_type(native_dialog::MessageType::Warning)
-                .set_title(r#""BadLang™" wants to manage incoming network connections. Allow?"#)
+                .set_title("BadLang™")
+                .set_text(r#""BadLang™" wants to manage incoming network connections. Allow?"#)
                 .show_confirm();
             let _ = native_dialog::MessageDialog::new()
                 .set_type(native_dialog::MessageType::Warning)
-                .set_title(r#""BadLang™" wants to access your passwords. Allow?"#)
+                .set_title("BadLang™")
+                .set_text(r#""BadLang™" wants to access your passwords. Allow?"#)
                 .show_confirm();
             let _ = native_dialog::MessageDialog::new()
                 .set_type(native_dialog::MessageType::Warning)
-                .set_title(r#""BadLang™" wants to access your liver. Allow?"#)
+                .set_title("BadLang™")
+                .set_text(r#""BadLang™" wants to access your liver. Allow?"#)
                 .show_confirm();
         }
     })
