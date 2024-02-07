@@ -65,7 +65,7 @@ enum Token {
     Swap,
     /// Lets the thing jump over. No good jokes here. a b -- a b a
     Over,
-    /// Rotates three things, much like my testicules. a b c -- b c a
+    /// Rotates three things, much like my testicles. a b c -- b c a
     Rot,
     /// Prints the character with the corresponding Unicode code point,
     /// much like the putc() C function (well except for the Unicode part).
