@@ -70,7 +70,7 @@ enum Token {
     /// Prints the character with the corresponding Unicode code point,
     /// much like the putc() C function (well except for the Unicode part).
     Print,
-    /// Does absolutly nothing, much like this programming language.
+    /// Does absolutely nothing, much like this programming language.
     Dummy,
 }
 
