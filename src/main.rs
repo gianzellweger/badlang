@@ -422,7 +422,7 @@ I solemnly declare that I've thoroughly read and understood th
 // character U+2002, which looks identical. This is to prevent copying.
 const ACCEPTANCE_PHRASE: &str = "I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions";
 
-const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1; // Also known as 10%
+const CHANCE_OF_SERVER_MAINTENANCE: f64 = 0.1; // Also known as 10%
 
 const FREE_RUNS: usize = 5;
 
@@ -475,7 +475,7 @@ fn sillyness(save_data: &mut SaveData) {
         report_error("To use this programming language, you need an internet connection!");
     }
 
-    if fastrand::f64() <= CHANCE_OF_SERVER_MAINTAINANCE {
+    if fastrand::f64() <= CHANCE_OF_SERVER_MAINTENANCE {
         report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!");
     }
 
@@ -632,7 +632,7 @@ fn sillyness(save_data: &mut SaveData) {
         }
         FIRST_OPTION => {
             let Some(account) = save_data.account.as_ref() else {
-                report_error("You do infact not have an account");
+                report_error("You do in fact not have an account");
             };
 
             let name = inquire::Text::new("Enter your name: ")
@@ -662,7 +662,7 @@ fn sillyness(save_data: &mut SaveData) {
                     Err(())
                 }
             };
-            // I want to draw your attention to the fact that this does infact do
+            // I want to draw your attention to the fact that this does in fact do
             // nothing at all, like so many checkboxes of this type
             let _ = inquire::Confirm::new("Remember password?")
                 .with_formatter(bool_formatter)
