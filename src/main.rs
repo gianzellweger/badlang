@@ -27,7 +27,7 @@ use argon2::{
 };
 use colored::Colorize;
 use geocoding::Reverse;
-use inquire::validator::Validation;
+use inquire::{validator::Validation, CustomUserError};
 use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
@@ -435,7 +435,8 @@ const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
 const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
 
-fn password_validator(password: &str) -> Result<Validation, inquire::error::CustomUserError> {
+#[allow(clippy::unnecessary_wraps)]
+fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
     // Yes this is very much a stolen idea from the Password game. I thought
     // it's a nice nod to the game after basically copying half its
     // concept
@@ -449,33 +450,33 @@ fn password_validator(password: &str) -> Result<Validation, inquire::error::Cust
         }
     });
 
-    if password.is_empty() {
-        Ok(Validation::Invalid("The password is required".into()))
+    Ok(if password.is_empty() {
+        Validation::Invalid("The password is required".into())
     } else if password.chars().count() < 18 {
-        Ok(Validation::Invalid("Your password needs to be at least 18 characters long".into()))
+        Validation::Invalid("Your password needs to be at least 18 characters long".into())
     } else if password.chars().count() > 26 {
-        Ok(Validation::Invalid("Your password cannot exceed 26 characters".into()))
+        Validation::Invalid("Your password cannot exceed 26 characters".into())
     } else if password.chars().any(char::is_whitespace) {
-        Ok(Validation::Invalid("Your password may not contain any whitespace".into()))
+        Validation::Invalid("Your password may not contain any whitespace".into())
     } else if !password.chars().any(char::is_uppercase) {
-        Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
+        Validation::Invalid("Your password must contain an uppercase letter".into())
     } else if !password.chars().any(char::is_lowercase) {
-        Ok(Validation::Invalid("Your password must contain a lowercase letter".into()))
+        Validation::Invalid("Your password must contain a lowercase letter".into())
     } else if !password.chars().any(|c| c.is_ascii_digit()) {
-        Ok(Validation::Invalid("Your password must contain a number".into()))
+        Validation::Invalid("Your password must contain a number".into())
     } else if password.chars().all(char::is_alphanumeric) {
-        Ok(Validation::Invalid("Your password must contain a special character".into()))
+        Validation::Invalid("Your password must contain a special character".into())
     } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
-        Ok(Validation::Invalid("Your password may not contain duplicate characters".into()))
+        Validation::Invalid("Your password may not contain duplicate characters".into())
     } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
-        Ok(Validation::Invalid("Your password may not contain any well known sequences".into()))
+        Validation::Invalid("Your password may not contain any well known sequences".into())
     } else if let Some(wordle_answer) = todays_wordle_answer
         && !password.contains(wordle_answer.as_str())
     {
-        Ok(Validation::Invalid("Your password must contain today's wordle answer".into()))
+        Validation::Invalid("Your password must contain today's wordle answer".into())
     } else {
-        Ok(Validation::Valid)
-    }
+        Validation::Valid
+    })
 }
 
 fn sillyness(save_data: &mut SaveData) {
