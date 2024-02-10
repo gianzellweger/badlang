@@ -297,7 +297,7 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
-    static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((20, 20));
+    static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((4, 4));
     static POSITION: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((0, 0));
 
     let (screen_x, screen_y) = window
@@ -554,6 +554,23 @@ fn sillyness(save_data: &mut SaveData) {
     println!();
 
     let argon2 = Argon2::default();
+    let password_validator: fn(&str) -> Result<Validation, inquire::error::CustomUserError> = |password: &str| {
+        if password.chars().any(|c| c.is_whitespace()) {
+            Ok(Validation::Invalid("Your password may not contain any whitespace".into()))
+        } else if !password.chars().any(|c| c.is_uppercase()) {
+            Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
+        } else if !password.chars().any(|c| c.is_lowercase()) {
+            Ok(Validation::Invalid("Your password must contain an lowercase letter".into()))
+        } else if !password.chars().any(|c| c.is_ascii_digit()) {
+            Ok(Validation::Invalid("Your password must contain a number".into()))
+        } else if password.chars().all(|c| c.is_alphanumeric()) {
+            Ok(Validation::Invalid("Your password must contain a special character".into()))
+        } else if !password.chars().any(|c| c.is_uppercase()) {
+            Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
+        } else {
+            Ok(Validation::Valid)
+        }
+    };
 
     match inquire::Select::new("To use this programming language, you need a BadLang™ Account. Do you already have one?", vec![
         FIRST_OPTION,
@@ -574,18 +591,21 @@ fn sillyness(save_data: &mut SaveData) {
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
             let password_repetition = inquire::Password::new("Repeat your password: ")
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
             let password_repetition2 = inquire::Password::new("Repeat your password again: ")
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
 
@@ -645,6 +665,7 @@ fn sillyness(save_data: &mut SaveData) {
                 .without_confirmation()
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
 
@@ -664,7 +685,7 @@ fn sillyness(save_data: &mut SaveData) {
             };
             // I want to draw your attention to the fact that this does infact do
             // nothing at all, like so many checkboxes of this type
-            let _ = inquire::Confirm::new("Remember password?")
+            inquire::Confirm::new("Remember password?")
                 .with_formatter(bool_formatter)
                 .with_parser(bool_parser)
                 .with_error_message(
@@ -675,7 +696,8 @@ fn sillyness(save_data: &mut SaveData) {
                     )
                     .as_str(),
                 )
-                .prompt();
+                .prompt()
+                .expect("Confirm or cancel");
 
             let parsed_hash = PasswordHash::new(&account.password_hash).expect("Oh no");
             if !(name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok()) {
