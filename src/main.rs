@@ -15,6 +15,7 @@
 
 use core::str;
 use std::{
+    collections::HashSet,
     io::Write,
     path::PathBuf,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -434,6 +435,49 @@ const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
 const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
 
+fn password_validator(password: &str) -> Result<Validation, inquire::error::CustomUserError> {
+    // Yes this is very much a stolen idea from the Password game. I thought
+    // it's a nice nod to the game after basically copying half its
+    // concept
+    let todays_wordle_answer = reqwest::blocking::get(format!("https://www.nytimes.com/svc/wordle/v2/{}.json", chrono::offset::Local::now().date_naive().format("%Y-%m-%d"))).map_or(None, |res| {
+        match res.json::<serde_json::Value>() {
+            Ok(serde_json::Value::Object(map)) => match map.get("solution") {
+                Some(serde_json::Value::String(solution)) => Some(solution.clone()),
+                _ => None,
+            },
+            _ => None,
+        }
+    });
+
+    if password.is_empty() {
+        Ok(Validation::Invalid("The password is required".into()))
+    } else if password.chars().count() < 18 {
+        Ok(Validation::Invalid("Your password needs to be at least 18 characters long".into()))
+    } else if password.chars().count() > 26 {
+        Ok(Validation::Invalid("Your password cannot exceed 26 characters".into()))
+    } else if password.chars().any(char::is_whitespace) {
+        Ok(Validation::Invalid("Your password may not contain any whitespace".into()))
+    } else if !password.chars().any(char::is_uppercase) {
+        Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
+    } else if !password.chars().any(char::is_lowercase) {
+        Ok(Validation::Invalid("Your password must contain a lowercase letter".into()))
+    } else if !password.chars().any(|c| c.is_ascii_digit()) {
+        Ok(Validation::Invalid("Your password must contain a number".into()))
+    } else if password.chars().all(char::is_alphanumeric) {
+        Ok(Validation::Invalid("Your password must contain a special character".into()))
+    } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
+        Ok(Validation::Invalid("Your password may not contain duplicate characters".into()))
+    } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
+        Ok(Validation::Invalid("Your password may not contain any well known sequences".into()))
+    } else if let Some(wordle_answer) = todays_wordle_answer
+        && !password.contains(wordle_answer.as_str())
+    {
+        Ok(Validation::Invalid("Your password must contain today's wordle answer".into()))
+    } else {
+        Ok(Validation::Valid)
+    }
+}
+
 fn sillyness(save_data: &mut SaveData) {
     // This macos version panics for some reason currently. Will fix later
     // #[cfg(target_os = "macos")]
@@ -554,21 +598,6 @@ fn sillyness(save_data: &mut SaveData) {
     println!();
 
     let argon2 = Argon2::default();
-    let password_validator: fn(&str) -> Result<Validation, inquire::error::CustomUserError> = |password: &str| {
-        if password.chars().any(char::is_whitespace) {
-            Ok(Validation::Invalid("Your password may not contain any whitespace".into()))
-        } else if !password.chars().any(char::is_uppercase) {
-            Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
-        } else if !password.chars().any(char::is_lowercase) {
-            Ok(Validation::Invalid("Your password must contain a lowercase letter".into()))
-        } else if !password.chars().any(|c| c.is_ascii_digit()) {
-            Ok(Validation::Invalid("Your password must contain a number".into()))
-        } else if password.chars().all(char::is_alphanumeric) {
-            Ok(Validation::Invalid("Your password must contain a special character".into()))
-        } else {
-            Ok(Validation::Valid)
-        }
-    };
 
     match inquire::Select::new("To use this programming language, you need a BadLang™ Account. Do you already have one?", vec![
         FIRST_OPTION,
@@ -587,22 +616,16 @@ fn sillyness(save_data: &mut SaveData) {
 
             let password = inquire::Password::new("Enter your password: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
                 .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
             let password_repetition = inquire::Password::new("Repeat your password: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
                 .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
             let password_repetition2 = inquire::Password::new("Repeat your password again: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
                 .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
@@ -661,8 +684,6 @@ fn sillyness(save_data: &mut SaveData) {
 
             let password = inquire::Password::new("Enter your password: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
                 .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");

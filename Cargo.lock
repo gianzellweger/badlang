@@ -381,6 +381,7 @@ name = "badlang"
 version = "0.3.3"
 dependencies = [
  "argon2",
+ "chrono",
  "clap",
  "colored",
  "fastrand 2.0.1",
@@ -401,6 +402,7 @@ dependencies = [
  "savefile",
  "savefile-derive",
  "semver 1.0.21",
+ "serde_json",
  "static_assertions",
  "strum",
  "strum_macros",
