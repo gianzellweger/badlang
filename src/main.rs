@@ -555,18 +555,16 @@ fn sillyness(save_data: &mut SaveData) {
 
     let argon2 = Argon2::default();
     let password_validator: fn(&str) -> Result<Validation, inquire::error::CustomUserError> = |password: &str| {
-        if password.chars().any(|c| c.is_whitespace()) {
+        if password.chars().any(char::is_whitespace) {
             Ok(Validation::Invalid("Your password may not contain any whitespace".into()))
-        } else if !password.chars().any(|c| c.is_uppercase()) {
+        } else if !password.chars().any(char::is_uppercase) {
             Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
-        } else if !password.chars().any(|c| c.is_lowercase()) {
-            Ok(Validation::Invalid("Your password must contain an lowercase letter".into()))
+        } else if !password.chars().any(char::is_lowercase) {
+            Ok(Validation::Invalid("Your password must contain a lowercase letter".into()))
         } else if !password.chars().any(|c| c.is_ascii_digit()) {
             Ok(Validation::Invalid("Your password must contain a number".into()))
-        } else if password.chars().all(|c| c.is_alphanumeric()) {
+        } else if password.chars().all(char::is_alphanumeric) {
             Ok(Validation::Invalid("Your password must contain a special character".into()))
-        } else if !password.chars().any(|c| c.is_uppercase()) {
-            Ok(Validation::Invalid("Your password must contain an uppercase letter".into()))
         } else {
             Ok(Validation::Valid)
         }
