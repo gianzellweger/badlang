@@ -1,6 +1,6 @@
 [package]
 name = "badlang"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["The BadLang™ Developers <contact@badlang.dev>"]
 rust-version = "1.72.0"
 description = "Next generation stack-based programming language"
