@@ -19,6 +19,26 @@ This language isn't just the next trend - it's the future. You've heard of "Rewr
 
 This language features the newest paradigm: Stack-based programming. You've heard of imperative, you've heard of functional, but have you heard of stack-based? It was established in 1970 by the Forth language, so probably not.
 
+## Installation
+
+### Sane operating systems
+```
+cargo install badlang
+```
+Alternatively, if you have [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) installed you can instead use:
+```
+cargo binstall badlang
+```
+
+### Windows
+Since Windows refuses to correctly work if downloaded as provided above, you have to build from source:
+```
+git clone https://github.com/gianzellweger/badlang/
+cd badlang
+cargo run
+```
+<sup>BadLang™ is (officially) supported on MacOS, GNU+Linux and Windows (somewhat)</sup>
+
 ## Examples
 
 ### Basic example

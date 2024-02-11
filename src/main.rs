@@ -15,6 +15,7 @@
 
 use core::str;
 use std::{
+    collections::HashSet,
     io::Write,
     path::PathBuf,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -26,7 +27,7 @@ use argon2::{
 };
 use colored::Colorize;
 use geocoding::Reverse;
-use inquire::validator::Validation;
+use inquire::{validator::Validation, CustomUserError};
 use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
@@ -65,12 +66,12 @@ enum Token {
     Swap,
     /// Lets the thing jump over. No good jokes here. a b -- a b a
     Over,
-    /// Rotates three things, much like my testicules. a b c -- b c a
+    /// Rotates three things, much like my testicles. a b c -- b c a
     Rot,
     /// Prints the character with the corresponding Unicode code point,
     /// much like the putc() C function (well except for the Unicode part).
     Print,
-    /// Does absolutly nothing, much like this programming language.
+    /// Does absolutely nothing, much like this programming language.
     Dummy,
 }
 
@@ -297,7 +298,7 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
-    static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((20, 20));
+    static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((4, 4));
     static POSITION: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((0, 0));
 
     let (screen_x, screen_y) = window
@@ -422,7 +423,7 @@ I solemnly declare that I've thoroughly read and understood th
 // character U+2002, which looks identical. This is to prevent copying.
 const ACCEPTANCE_PHRASE: &str = "I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions";
 
-const CHANCE_OF_SERVER_MAINTAINANCE: f64 = 0.1; // Also known as 10%
+const CHANCE_OF_SERVER_MAINTENANCE: f64 = 0.1; // Also known as 10%
 
 const FREE_RUNS: usize = 5;
 
@@ -433,6 +434,50 @@ const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
 
 const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
+
+#[allow(clippy::unnecessary_wraps)]
+fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
+    // Yes this is very much a stolen idea from the Password game. I thought
+    // it's a nice nod to the game after basically copying half its
+    // concept
+    let todays_wordle_answer = reqwest::blocking::get(format!("https://www.nytimes.com/svc/wordle/v2/{}.json", chrono::offset::Local::now().date_naive().format("%Y-%m-%d"))).map_or(None, |res| {
+        match res.json::<serde_json::Value>() {
+            Ok(serde_json::Value::Object(map)) => match map.get("solution") {
+                Some(serde_json::Value::String(solution)) => Some(solution.clone()),
+                _ => None,
+            },
+            _ => None,
+        }
+    });
+
+    Ok(if password.is_empty() {
+        Validation::Invalid("The password is required".into())
+    } else if password.chars().count() < 18 {
+        Validation::Invalid("Your password needs to be at least 18 characters long".into())
+    } else if password.chars().count() > 26 {
+        Validation::Invalid("Your password cannot exceed 26 characters".into())
+    } else if password.chars().any(char::is_whitespace) {
+        Validation::Invalid("Your password may not contain any whitespace".into())
+    } else if !password.chars().any(char::is_uppercase) {
+        Validation::Invalid("Your password must contain an uppercase letter".into())
+    } else if !password.chars().any(char::is_lowercase) {
+        Validation::Invalid("Your password must contain a lowercase letter".into())
+    } else if !password.chars().any(|c| c.is_ascii_digit()) {
+        Validation::Invalid("Your password must contain a number".into())
+    } else if password.chars().all(char::is_alphanumeric) {
+        Validation::Invalid("Your password must contain a special character".into())
+    } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
+        Validation::Invalid("Your password may not contain duplicate characters".into())
+    } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
+        Validation::Invalid("Your password may not contain any well known sequences".into())
+    } else if let Some(wordle_answer) = todays_wordle_answer
+        && !password.contains(wordle_answer.as_str())
+    {
+        Validation::Invalid("Your password must contain today's wordle answer".into())
+    } else {
+        Validation::Valid
+    })
+}
 
 fn sillyness(save_data: &mut SaveData) {
     // This macos version panics for some reason currently. Will fix later
@@ -475,7 +520,7 @@ fn sillyness(save_data: &mut SaveData) {
         report_error("To use this programming language, you need an internet connection!");
     }
 
-    if fastrand::f64() <= CHANCE_OF_SERVER_MAINTAINANCE {
+    if fastrand::f64() <= CHANCE_OF_SERVER_MAINTENANCE {
         report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!");
     }
 
@@ -572,20 +617,17 @@ fn sillyness(save_data: &mut SaveData) {
 
             let password = inquire::Password::new("Enter your password: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
             let password_repetition = inquire::Password::new("Repeat your password: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
             let password_repetition2 = inquire::Password::new("Repeat your password again: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
 
@@ -632,7 +674,7 @@ fn sillyness(save_data: &mut SaveData) {
         }
         FIRST_OPTION => {
             let Some(account) = save_data.account.as_ref() else {
-                report_error("You do infact not have an account");
+                report_error("You do in fact not have an account");
             };
 
             let name = inquire::Text::new("Enter your name: ")
@@ -643,8 +685,7 @@ fn sillyness(save_data: &mut SaveData) {
 
             let password = inquire::Password::new("Enter your password: ")
                 .without_confirmation()
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(18))
+                .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
 
@@ -662,9 +703,9 @@ fn sillyness(save_data: &mut SaveData) {
                     Err(())
                 }
             };
-            // I want to draw your attention to the fact that this does infact do
+            // I want to draw your attention to the fact that this does in fact do
             // nothing at all, like so many checkboxes of this type
-            let _ = inquire::Confirm::new("Remember password?")
+            inquire::Confirm::new("Remember password?")
                 .with_formatter(bool_formatter)
                 .with_parser(bool_parser)
                 .with_error_message(
@@ -675,7 +716,8 @@ fn sillyness(save_data: &mut SaveData) {
                     )
                     .as_str(),
                 )
-                .prompt();
+                .prompt()
+                .expect("Confirm or cancel");
 
             let parsed_hash = PasswordHash::new(&account.password_hash).expect("Oh no");
             if !(name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok()) {
