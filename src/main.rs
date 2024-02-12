@@ -13,7 +13,6 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_possible_wrap)]
 
-use core::str;
 use std::{
     collections::HashSet,
     io::Write,
@@ -560,6 +559,7 @@ fn sillyness(save_data: &mut SaveData) {
         }
     })
     .detach();
+
     if !save_data.dialogs_displayed {
         save_data.dialogs_displayed = true;
     }
@@ -589,6 +589,7 @@ fn sillyness(save_data: &mut SaveData) {
             .expect("No"),
         _ => TYPES_OF_COOKIES.to_vec(),
     };
+
     if !accepted_cookies.is_empty() {
         println!("The types of cookies you accepted are:");
         for cookie in accepted_cookies {
@@ -634,6 +635,7 @@ fn sillyness(save_data: &mut SaveData) {
             if !(password == password_repetition && password_repetition == password_repetition2 && password == password_repetition2) {
                 report_error("Your passwords do not match!");
             }
+
             let salt = SaltString::generate(&mut OsRng);
             let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
 
