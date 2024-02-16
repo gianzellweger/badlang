@@ -465,12 +465,15 @@ fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
         Validation::Invalid("Your password must contain a number".into())
     } else if password.chars().all(char::is_alphanumeric) {
         Validation::Invalid("Your password must contain a special character".into())
+    } else if !password.chars().any(|c| unic_emoji_char::is_emoji(c) && !c.is_ascii()) {
+        Validation::Invalid("Your password must contain an emoji".into())
     } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
         Validation::Invalid("Your password may not contain duplicate characters".into())
     } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
         Validation::Invalid("Your password may not contain any well known sequences".into())
     } else if let Some(wordle_answer) = todays_wordle_answer
         && !password.contains(wordle_answer.as_str())
+        && wordle_answer.chars().collect::<HashSet<_>>().len() == wordle_answer.len()
     {
         Validation::Invalid("Your password must contain today's wordle answer".into())
     } else {
@@ -524,6 +527,7 @@ fn sillyness(save_data: &mut SaveData) {
     }
 
     let save_data_clone = save_data.clone();
+    #[cfg(not(target = "x86_64-apple-darwin"))] // The dialogs currently segfault on intel macs
     jod_thread::spawn(move || {
         if !save_data_clone.dialogs_displayed {
             let _ = native_dialog::MessageDialog::new()
@@ -685,11 +689,7 @@ fn sillyness(save_data: &mut SaveData) {
                 .prompt()
                 .expect("Enter your name");
 
-            let password = inquire::Password::new("Enter your password: ")
-                .without_confirmation()
-                .with_validator(password_validator)
-                .prompt()
-                .expect("Enter a password");
+            let password = inquire::Password::new("Enter your password: ").without_confirmation().prompt().expect("Enter a password");
 
             let confirm_signs = ["✅", "✅", "✔️", "✓", "✔"];
             let cancel_signs = [
