@@ -527,7 +527,7 @@ fn sillyness(save_data: &mut SaveData) {
     }
 
     let save_data_clone = save_data.clone();
-    // #[cfg(not(all(target_os = "macos", not(debug_assertions))))] // The dialogs currently segfault on intel macs
+    #[cfg(not(all(target_os = "macos", not(debug_assertions))))] // The dialogs currently segfault on intel macs
     jod_thread::spawn(move || {
         if !save_data_clone.dialogs_displayed {
             let _ = native_dialog::MessageDialog::new()
@@ -617,6 +617,13 @@ fn sillyness(save_data: &mut SaveData) {
             let name = inquire::Text::new("Enter your username: ")
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(16))
+                .with_validator(|name: &str| {
+                    Ok(if name.chars().all(|c| c.is_lowercase() || c.is_ascii_digit() || c == '-' || c == '_') {
+                        Validation::Valid
+                    } else {
+                        Validation::Invalid("Usernames may only contain lowercase letters, numbers, underscores and dashes".into())
+                    })
+                })
                 .prompt()
                 .expect("Enter your name");
 
