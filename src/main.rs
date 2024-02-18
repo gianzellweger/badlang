@@ -527,7 +527,7 @@ fn sillyness(save_data: &mut SaveData) {
     }
 
     let save_data_clone = save_data.clone();
-    #[cfg(not(target = "x86_64-apple-darwin"))] // The dialogs currently segfault on intel macs
+    // #[cfg(not(all(target_os = "macos", not(debug_assertions))))] // The dialogs currently segfault on intel macs
     jod_thread::spawn(move || {
         if !save_data_clone.dialogs_displayed {
             let _ = native_dialog::MessageDialog::new()
