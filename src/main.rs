@@ -998,9 +998,4 @@ mod tests {
         assert!(stack.get(3).is_some_and(|v| *v == 3));
         assert!(stack.get(4).is_some_and(|v| *v == 2));
     }
-
-    #[test]
-    fn test_emoji() {
-        assert!(unic_emoji_char::is_emoji('😍'));
-    }
 }
