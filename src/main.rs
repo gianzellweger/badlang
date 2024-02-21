@@ -13,11 +13,11 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_possible_wrap)]
 
-use core::str;
 use std::{
     collections::HashSet,
     io::Write,
     path::PathBuf,
+    sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -245,7 +245,7 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
 }
 
 // This part of the program serves absolutely no reason is just here
-// because I find it incredibly funny.
+// because I find it incredibly funny. More about the motivation can be read here: https://github.com/gianzellweger/badlang/blob/release/MOTIVATION.md
 
 // List of "features" and a roadmap can be found at https://github.com/gianzellweger/badlang/issues/3
 
@@ -294,12 +294,12 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[allow(dead_code)]
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
 fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
-    static VELOCITY: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((4, 4));
-    static POSITION: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((0, 0));
+    static VELOCITY: Mutex<(i32, i32)> = Mutex::new((4, 4));
+    static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
 
     let (screen_x, screen_y) = window
         .current_monitor()
@@ -435,8 +435,29 @@ const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
 const FIRST_OPTION: &str = "Yes, proceed to login";
 const SECOND_OPTION: &str = "No, proceed to signup";
 
+fn fetch_data(url: &str) -> Option<Vec<String>> {
+    // Make a blocking GET request
+    let response = reqwest::blocking::get(url).ok()?;
+
+    // Check if the request was successful (status code 200 OK)
+    if response.status().is_success() {
+        // Read the response body as a string
+        let body = response.text().ok()?;
+
+        // Split the data by new-line
+        let lines: Vec<String> = body.lines().map(String::from).collect();
+
+        Some(lines)
+    } else {
+        // If the request was not successful, return an error
+        None
+    }
+}
+
 #[allow(clippy::unnecessary_wraps)]
 fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
+    static TOP_100_PASSWORDS: Mutex<Option<Vec<String>>> = Mutex::new(None);
+
     // Yes this is very much a stolen idea from the Password game. I thought
     // it's a nice nod to the game after basically copying half its
     // concept
@@ -449,6 +470,19 @@ fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
             _ => None,
         }
     });
+
+    let mut top_100_passwords = TOP_100_PASSWORDS.lock().expect("Unreachable");
+
+    if top_100_passwords.is_none() {
+        *top_100_passwords =
+            Some(fetch_data("https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-10000.txt").unwrap_or_default());
+    };
+
+    let password_list = if top_100_passwords.as_ref().is_some_and(Vec::is_empty) {
+        None
+    } else {
+        top_100_passwords.as_ref()
+    };
 
     Ok(if password.is_empty() {
         Validation::Invalid("The password is required".into())
@@ -466,22 +500,31 @@ fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
         Validation::Invalid("Your password must contain a number".into())
     } else if password.chars().all(char::is_alphanumeric) {
         Validation::Invalid("Your password must contain a special character".into())
+    } else if !password.chars().any(|c| unic_emoji_char::is_emoji(c) && !c.is_ascii()) {
+        Validation::Invalid("Your password must contain an emoji".into())
     } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
         Validation::Invalid("Your password may not contain duplicate characters".into())
     } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
         Validation::Invalid("Your password may not contain any well known sequences".into())
-    } else if let Some(wordle_answer) = todays_wordle_answer
-        && !password.contains(wordle_answer.as_str())
+    } else if let Some(wordle_answer) = todays_wordle_answer.as_ref()
+        && !password.to_lowercase().contains(wordle_answer.to_lowercase().as_str())
+        && wordle_answer.chars().collect::<HashSet<_>>().len() == wordle_answer.len()
     {
         Validation::Invalid("Your password must contain today's wordle answer".into())
+    } else if let Some(passwords) = password_list
+        && let Some(part) = passwords.iter().find(|&pw| password.contains(pw))
+        && let Some(wordle_answer) = todays_wordle_answer
+        && !passwords.contains(&wordle_answer)
+    {
+        Validation::Invalid(format!("Your password contains one of the top 100 most common passwords, '{part}', making it insecure").into())
     } else {
         Validation::Valid
     })
 }
 
 fn sillyness(save_data: &mut SaveData) {
-    // This macos version panics for some reason currently. Will fix later
-    // #[cfg(target_os = "macos")]
+    // This macos version panics for some reason currently. This code should
+    // theoretically work, tauri is just buggy. #[cfg(target_os = "macos")]
     // {
     //     println!(
     //         "Because you're on MacOS, the Video Player sadly cannot run
@@ -525,6 +568,7 @@ fn sillyness(save_data: &mut SaveData) {
     }
 
     let save_data_clone = save_data.clone();
+    #[cfg(not(all(target_os = "macos", not(debug_assertions))))] // The dialogs currently segfault on intel macs
     jod_thread::spawn(move || {
         if !save_data_clone.dialogs_displayed {
             let _ = native_dialog::MessageDialog::new()
@@ -560,6 +604,7 @@ fn sillyness(save_data: &mut SaveData) {
         }
     })
     .detach();
+
     if !save_data.dialogs_displayed {
         save_data.dialogs_displayed = true;
     }
@@ -589,6 +634,7 @@ fn sillyness(save_data: &mut SaveData) {
             .expect("No"),
         _ => TYPES_OF_COOKIES.to_vec(),
     };
+
     if !accepted_cookies.is_empty() {
         println!("The types of cookies you accepted are:");
         for cookie in accepted_cookies {
@@ -612,8 +658,15 @@ fn sillyness(save_data: &mut SaveData) {
             let name = inquire::Text::new("Enter your username: ")
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(16))
+                .with_validator(|name: &str| {
+                    Ok(if name.chars().all(|c| c.is_lowercase() || c.is_ascii_digit() || c == '.' || c == '_') {
+                        Validation::Valid
+                    } else {
+                        Validation::Invalid("Usernames may only contain lowercase letters, numbers, underscores and dashes".into())
+                    })
+                })
                 .prompt()
-                .expect("Enter your name");
+                .expect("Enter your username");
 
             let password = inquire::Password::new("Enter your password: ")
                 .without_confirmation()
@@ -634,6 +687,7 @@ fn sillyness(save_data: &mut SaveData) {
             if !(password == password_repetition && password_repetition == password_repetition2 && password == password_repetition2) {
                 report_error("Your passwords do not match!");
             }
+
             let salt = SaltString::generate(&mut OsRng);
             let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
 
@@ -677,17 +731,13 @@ fn sillyness(save_data: &mut SaveData) {
                 report_error("You do in fact not have an account");
             };
 
-            let name = inquire::Text::new("Enter your name: ")
+            let name = inquire::Text::new("Enter your username: ")
                 .with_validator(inquire::required!())
                 .with_validator(inquire::min_length!(16))
                 .prompt()
-                .expect("Enter your name");
+                .expect("Enter your username");
 
-            let password = inquire::Password::new("Enter your password: ")
-                .without_confirmation()
-                .with_validator(password_validator)
-                .prompt()
-                .expect("Enter a password");
+            let password = inquire::Password::new("Enter your password: ").without_confirmation().prompt().expect("Enter a password");
 
             let confirm_signs = ["✅", "✅", "✔️", "✓", "✔"];
             let cancel_signs = [
