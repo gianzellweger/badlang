@@ -1,5 +1,6 @@
 #![feature(let_chains)]
 #![feature(if_let_guard)]
+#![feature(map_try_insert)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 #![deny(clippy::pedantic)]
@@ -14,7 +15,7 @@
 #![allow(clippy::cast_possible_wrap)]
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     io::Write,
     path::PathBuf,
     sync::Mutex,
@@ -28,6 +29,7 @@ use argon2::{
 use colored::Colorize;
 use geocoding::Reverse;
 use inquire::{validator::Validation, CustomUserError};
+use itertools::Itertools;
 use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
@@ -44,11 +46,272 @@ fn report_warning(string: &str) {
     eprintln!("{}: {string}", "WARNING".bold().yellow());
 }
 
-#[derive(EnumCountMacro, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Debug)]
+enum StackValue {
+    Integer(i64),
+    Float(f64),
+    String(String),
+    Bool(bool),
+}
+
+impl std::fmt::Display for StackValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Integer(int) => write!(f, "{int}"),
+            Self::Float(float) => write!(f, "{float:.2}"),
+            Self::String(string) => write!(f, "{string}"),
+            Self::Bool(boolean) => write!(f, "{boolean}"),
+        }
+    }
+}
+
+impl std::ops::Add for StackValue {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        match self {
+            Self::String(string) => Self::String(string + other.to_string().as_str()),
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(int + int2),
+                Self::Float(float) => Self::Float(int as f64 + float),
+                Self::String(string) => Self::String(int.to_string() + string.as_str()),
+                Self::Bool(boolean) => Self::String(int.to_string() + boolean.to_string().as_str()),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(int) => Self::Float(float + int as f64),
+                Self::Float(float2) => Self::Float(float + float2),
+                Self::String(string) => Self::String(self.to_string() + string.as_str()),
+                Self::Bool(boolean) => Self::String(self.to_string() + boolean.to_string().as_str()),
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Integer(i64::from(boolean) + i64::from(boolean2)),
+                Self::String(string) => Self::String(boolean.to_string() + string.as_str()),
+                Self::Float(_) => Self::String(boolean.to_string() + other.to_string().as_str()),
+                Self::Integer(int) => Self::String(boolean.to_string() + int.to_string().as_str()),
+            },
+        }
+    }
+}
+
+impl std::ops::Sub for StackValue {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        match self {
+            Self::String(string) => match other {
+                Self::Integer(int) => {
+                    if int < 0 {
+                        return Self::String(string + " ".repeat((-int) as usize).as_str());
+                    }
+                    if int as usize > string.len() {
+                        report_error("Tried to subtract int from string where the int is bigger than the strings length");
+                    }
+                    Self::String(string[..string.len() - int as usize].to_string())
+                }
+                Self::Float(float) => {
+                    let int = float.round() as i64;
+                    if int < 0 {
+                        return Self::String(string + " ".repeat((-int) as usize).as_str());
+                    }
+                    if int as usize > string.len() {
+                        report_error("Tried to subtract float from string where the float is bigger than the strings length");
+                    }
+                    Self::String(string[..string.len() - int as usize].to_string())
+                }
+                Self::Bool(bool) => {
+                    let int = i64::from(bool);
+                    if int as usize > string.len() {
+                        report_error("Tried to subtract bool from string where the bool is bigger than the strings length");
+                    }
+                    Self::String(string[..string.len() - int as usize].to_string())
+                }
+                Self::String(string2) => Self::String(string.replace(string2.as_str(), "")),
+            },
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(int - int2),
+                Self::Float(float) => Self::Float(int as f64 - float),
+                Self::String(string) => Self::String(int.to_string() + " - " + string.as_str()),
+                Self::Bool(boolean) => Self::Integer(int - i64::from(boolean)),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(int) => Self::Float(float - int as f64),
+                Self::Float(float2) => Self::Float(float - float2),
+                Self::String(string) => Self::String(self.to_string() + " - " + string.as_str()),
+                Self::Bool(boolean) => Self::Float(float - f64::from(boolean)),
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Integer(i64::from(boolean) - i64::from(boolean2)),
+                Self::String(string) => Self::String(boolean.to_string() + " - " + string.as_str()),
+                Self::Float(float) => Self::Float(f64::from(boolean) - float),
+                Self::Integer(int) => Self::Integer(i64::from(boolean) - int),
+            },
+        }
+    }
+}
+
+impl std::ops::Mul for StackValue {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        match self {
+            Self::String(string) => match other {
+                Self::Integer(int) => {
+                    let temp = string.repeat(int.unsigned_abs() as usize);
+                    Self::String(if int < 0 { temp.chars().rev().collect() } else { temp })
+                }
+                Self::Float(float) => {
+                    let temp = string.repeat(float.abs().floor() as usize) + &string[0..(string.len() as f64 * float.abs().fract()) as usize];
+                    Self::String(if float < 0.0 { temp.chars().rev().collect() } else { temp })
+                }
+                Self::Bool(boolean) => Self::String(if boolean { string } else { String::new() }),
+                Self::String(string2) => Self::String(string.chars().interleave(string2.chars()).collect()),
+            },
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(int * int2),
+                Self::Float(float) => Self::Float(int as f64 * float),
+                Self::String(string) => Self::String(string) * Self::Integer(int),
+                Self::Bool(boolean) => Self::Integer(int * i64::from(boolean)),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(int) => Self::Float(float * int as f64),
+                Self::Float(float2) => Self::Float(float * float2),
+                Self::String(string) => Self::String(string) * Self::Float(float),
+                Self::Bool(boolean) => Self::Float(float * f64::from(boolean)),
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Integer(i64::from(boolean && boolean2)),
+                Self::String(string) => Self::String(string.repeat(usize::from(boolean))),
+                Self::Float(float) => Self::Float(f64::from(boolean) * float),
+                Self::Integer(int) => Self::Integer(i64::from(boolean) * int),
+            },
+        }
+    }
+}
+
+impl std::ops::Div for StackValue {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        match self {
+            Self::String(string) => match other {
+                Self::Integer(int) => Self::String(string) * Self::Float(1.0 / int as f64),
+                Self::Float(float) => Self::String(string) * Self::Float(1.0 / float),
+                Self::Bool(boolean) => Self::String(if boolean { String::new() } else { string }),
+                Self::String(string2) => Self::String(string.split(string2.as_str()).collect::<Vec<_>>().join("/")),
+            },
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => {
+                    if int2 == 0 {
+                        report_error("Tried to divide by 0");
+                    }
+                    Self::Float(int as f64 / int2 as f64)
+                }
+                Self::Float(float) => {
+                    if float == 0.0 {
+                        report_error("Tried to divide by 0")
+                    }
+                    Self::Float(int as f64 / float)
+                }
+                Self::String(string) => Self::String(int.to_string() + " / " + string.as_str()),
+                Self::Bool(boolean) => Self::Integer(int / i64::from(boolean)),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(int) => {
+                    if int == 0 {
+                        report_error("Tried to divide by 0")
+                    }
+                    Self::Float(float / int as f64)
+                }
+                Self::Float(float2) => {
+                    if float2 == 0.0 {
+                        report_error("Tried to divide by 0")
+                    }
+                    Self::Float(float / float2)
+                }
+                Self::String(string) => Self::String(float.to_string() + " / " + string.as_str()),
+                Self::Bool(boolean) => {
+                    if !boolean {
+                        report_error("Tried to divide by 0")
+                    }
+                    Self::Float(float / f64::from(boolean))
+                }
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Integer(i64::from(boolean) / i64::from(boolean2)),
+                Self::String(string) => Self::String(boolean.to_string() + " / " + string.as_str()),
+                Self::Float(float) => {
+                    if float == 0.0 {
+                        report_error("Tried to divide by 0")
+                    }
+                    Self::Float(f64::from(boolean) / float)
+                }
+                Self::Integer(int) => {
+                    if int == 0 {
+                        report_error("Tried to divide by 0")
+                    }
+                    Self::Float(f64::from(boolean) / int as f64)
+                }
+            },
+        }
+    }
+}
+
+impl std::cmp::PartialEq for StackValue {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Self::String(string) => string == &other.to_string(),
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => int == int2,
+                Self::Float(float) => int == &(float.round() as i64),
+                Self::Bool(boolean) => *int == i64::from(*boolean),
+                Self::String(_) => other == self,
+            },
+            Self::Float(float) => match other {
+                Self::Float(float2) => float == float2,
+                Self::Bool(boolean) => *float == f64::from(*boolean),
+                _ => other == self,
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => boolean == boolean2,
+                _ => other == self,
+            },
+        }
+    }
+}
+
+impl std::cmp::Eq for StackValue {}
+
+impl std::cmp::PartialOrd for StackValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self {
+            Self::String(string) => string.partial_cmp(&other.to_string()),
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => int.partial_cmp(int2),
+                Self::Float(float) => ((*int) as f64).partial_cmp(float),
+                Self::Bool(boolean) => int.partial_cmp(&i64::from(*boolean)),
+                Self::String(string) => int.to_string().partial_cmp(string),
+            },
+            Self::Float(float) => match other {
+                Self::Float(float2) => float.partial_cmp(float2),
+                Self::Integer(int) => float.partial_cmp(&(*int as f64)),
+                Self::Bool(boolean) => float.partial_cmp(&(f64::from(*boolean))),
+                Self::String(string) => float.to_string().partial_cmp(string),
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => boolean.partial_cmp(boolean2),
+                Self::Integer(int) => i64::from(*boolean).partial_cmp(int),
+                Self::Float(float) => f64::from(*boolean).partial_cmp(float),
+                Self::String(string) => boolean.to_string().partial_cmp(string),
+            },
+        }
+    }
+}
+
+#[derive(EnumCountMacro, Clone, PartialEq, Debug)]
 enum Token {
-    /// Just a fucking number
-    Number(i32),
-    /// Addition. Often used to add numbers
+    /// Just a fucking n̶u̶m̶b̶e̶r̶ value✨
+    StackValue(StackValue),
+    /// Addition. Often used to add numbers.
     Add,
     /// Subtraction. Nothin' more, Nothin' less.
     Subtract,
@@ -68,9 +331,52 @@ enum Token {
     Over,
     /// Rotates three things, much like my testicles. a b c -- b c a
     Rot,
-    /// Prints the character with the corresponding Unicode code point,
-    /// much like the putc() C function (well except for the Unicode part).
+    /// Prints da thang, no matter what it is (least racist keyword). a --
     Print,
+    /// if-condition, often used by white people. The u32 is an offset to
+    /// jump to.
+    If(usize),
+    /// elif is like an elif,
+    Elif(usize),
+    /// else-condition exists but is non-existent in tokens because
+    Else(usize),
+    /// fi also exists, but non-existent in tokens because
+    /// filif is a mixture between fi and elif:
+    /// Once it is reached, one of the if/(el)ifs has already executed,
+    /// meaning it will jump to fi.
+    Filif(usize),
+    /// Equality, much like the thing globally not yet reached.
+    Eq,
+    /// Strict equality, similar to javascripts strict equality thing.
+    Seq,
+    /// Even stricter equality, stricter than JavaScripts triple equal.
+    Sseq,
+    /// Inequality,
+    Ineq,
+    /// Strict inequality, similar to javascripts strict inequality thing.
+    Sineq,
+    /// Even stricter inequality, stricter than JavaScripts double inequal.
+    Ssineq,
+    /// Greater-than,
+    Gt,
+    /// Less-than,
+    Lt,
+    /// Greater-than or equal,
+    Ge,
+    /// Less-than or equal,
+    Le,
+    /// Shift right,
+    Shr,
+    /// Shift left,
+    Shl,
+    /// Or, both bool and integer
+    Or,
+    /// And, both bool and integer
+    And,
+    /// Not, both bool and integer
+    Not,
+    /// Xor, both bool and integer
+    Xor,
     /// Does absolutely nothing, much like this programming language.
     Dummy,
 }
@@ -83,39 +389,149 @@ fn parse_file(path: &PathBuf) -> Vec<Token> {
         }
     };
     let mut tokens = Vec::new();
+    let mut if_statements: Vec<usize> = Vec::with_capacity(4); // People are gonna wanna nest at least four times.
+    let mut elif_statements: HashMap<usize, usize> = HashMap::new();
+    let mut filif_statements: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut else_statements: Vec<usize> = Vec::with_capacity(3);
     let mut is_commenting = false;
-    for token in contents.split_whitespace() {
+    for (index, word) in contents.split_whitespace().enumerate() {
         if !is_commenting {
-            static_assertions::const_assert_eq!(Token::COUNT, 12);
-            tokens.push(match token {
+            static_assertions::const_assert_eq!(Token::COUNT, 32);
+            let token = match word {
                 "+" => Token::Add,
                 "-" => Token::Subtract,
                 "*" => Token::Multiply,
                 "/" => Token::Divide,
+                "=" => Token::Eq,
+                "==" => Token::Seq,
+                "===" => Token::Sseq,
+                "!=" => Token::Ineq,
+                "!==" => Token::Sineq,
+                "!===" => Token::Ssineq,
+                ">" => Token::Gt,
+                "<" => Token::Lt,
+                "=>" => Token::Ge,
+                "<=" => Token::Le,
+                ">>" => Token::Shr,
+                "<<" => Token::Shl,
+                "or" => Token::Or,
+                "and" => Token::And,
+                "not" => Token::Not,
+                "xor" => Token::Xor,
+                "if" => {
+                    if_statements.push(index);
+                    Token::If(usize::MAX)
+                }
+                "elif" => {
+                    let Some(if_index) = if_statements.last() else {
+                        report_error("Found 'elif' without 'if'");
+                    };
+                    if elif_statements.try_insert(*if_index, index).is_err() {
+                        report_error("Found two 'elif's next to eachother without 'filif' between them")
+                    }
+                    Token::Elif(usize::MAX)
+                }
+                "filif" => {
+                    let Some(if_index) = if_statements.last() else {
+                        report_error("Found 'filif' closing an if-statement that doesn't exist");
+                    };
+
+                    if let Some(filifs) = filif_statements.get_mut(if_index) {
+                        filifs.push(index);
+                        if let Some(elif_index) = elif_statements.remove(if_index)
+                            && let Some(Token::Elif(jump_addr)) = tokens.get_mut(elif_index)
+                        {
+                            *jump_addr = index + 1;
+                        } else {
+                            report_error("This is embarrassing");
+                        }
+                    } else {
+                        filif_statements.insert(*if_index, vec![index]);
+                        if let Some(Token::If(jump_addr)) = tokens.get_mut(*if_index) {
+                            *jump_addr = index + 1;
+                        } else {
+                            report_error("This is embarrassing");
+                        }
+                    }
+                    Token::Filif(usize::MAX)
+                }
+                "else" => {
+                    let Some(if_index) = if_statements.last() else {
+                        report_error("Found 'else' without match 'if'");
+                    };
+                    if let Some(elif_index) = elif_statements.remove(if_index) {
+                        if let Some(Token::Elif(jump_addr)) = tokens.get_mut(elif_index) {
+                            *jump_addr = index + 1;
+                        } else {
+                            report_error("This is embarrassing")
+                        }
+                    } else {
+                    }
+                    else_statements.push(index);
+                    Token::Else(usize::MAX)
+                }
+                "fi" => {
+                    let Some(if_index) = if_statements.pop() else {
+                        report_error("Found 'fi' closing an if-statement that doesn't exist");
+                    };
+                    if let Some(filifs) = filif_statements.remove(&if_index) {
+                        filifs.iter().for_each(|filif_index| {
+                            if let Some(Token::Filif(jump_addr)) = tokens.get_mut(*filif_index) {
+                                *jump_addr = index;
+                            }
+                        });
+                    }
+                    if let Some(else_index) = else_statements.pop() {
+                        let Some(Token::Else(else_statement)) = tokens.get_mut(else_index) else {
+                            report_error("This is embarrassing");
+                        };
+                        *else_statement = index; // TODO: check if
+                                                 // off-by-one
+                    }
+                    Token::Dummy
+                }
+
                 "dup" => Token::Dup,
                 "drop" => Token::Drop,
                 "swap" => Token::Swap,
                 "over" => Token::Over,
                 "rot" => Token::Rot,
                 "print" => Token::Print,
-                "coment" => {
+                "comment" => {
                     is_commenting = true;
                     Token::Dummy // This will just chill in the tokens
                 }
-                x if let Ok(num) = x.parse::<i32>() => Token::Number(num),
+                x if let Ok(int) = x.parse::<i64>() => Token::StackValue(StackValue::Integer(int)),
+                x if let Ok(float) = x.parse::<f64>() => Token::StackValue(StackValue::Float(float)),
+                x if let Ok(boolean) = x.parse::<bool>() => Token::StackValue(StackValue::Bool(boolean)),
+                x if x.chars().next().is_some_and(|c| c == '\'') && x.chars().last().is_some_and(|c| c == '\'') => Token::StackValue(StackValue::String(x[1..x.len() - 1].to_string())),
+                x if x.len() == 3 && x.chars().next().is_some_and(|c| c == '"') && x.chars().last().is_some_and(|c| c == '"') => {
+                    Token::StackValue(StackValue::Integer(x[1..x.len() - 1].chars().next().expect("This should work") as i64))
+                }
                 unrecognized => {
                     report_error(format!("Unrecognized token {unrecognized}").as_str());
                 }
-            });
+            };
+            tokens.push(token);
         }
-        if token == "no_coment" {
+        if word == "no_comment" {
             is_commenting = false;
         }
     }
+    if !if_statements.is_empty() {
+        report_error("Unclosed if-statement");
+    }
+    if !else_statements.is_empty() {
+        report_error("This shouldn't happen: Dangling else-statement");
+    }
+    if !filif_statements.is_empty() {
+        report_error("This shouldn't happen: Dangling filif-statements");
+    }
+
     tokens
 }
 
-fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
+fn execute_tokens(tokens: &[Token], out_of_free_runs: bool) -> Vec<StackValue> {
     if out_of_free_runs {
         let local_ip = local_ip_address::local_ip().expect("I'm so done").to_string();
         let info = geolocation::find(local_ip.as_str()).expect("What");
@@ -129,16 +545,17 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
-    let mut stack: Vec<i32> = Vec::new();
-    let mut stdout = std::io::stdout();
-    for token in tokens {
+    let mut stack: Vec<StackValue> = Vec::new();
+    let mut i: usize = 0;
+    while let Some(token) = tokens.get(i) {
         if out_of_free_runs {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
-        static_assertions::const_assert_eq!(Token::COUNT, 12);
+        static_assertions::const_assert_eq!(Token::COUNT, 32);
+        // println!("{token:?}, {i}");
         match token {
             Token::Dummy => {}
-            Token::Number(x) => stack.push(*x),
+            Token::StackValue(x) => stack.push(x.clone()),
             Token::Add => {
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
@@ -175,9 +592,18 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
                     report_error("The stack must contain at least two elements for a division to be made");
                 }
             }
+            Token::Eq => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(a == b));
+                } else {
+                    report_error("The stack must contain at least two elements for them to be compared");
+                }
+            }
             Token::Dup => {
                 if let Some(a) = stack.last() {
-                    stack.push(*a);
+                    stack.push(a.clone());
                 } else {
                     report_error("The stack must contain at least one element for it to be duplicated");
                 }
@@ -202,7 +628,7 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
                 {
-                    stack.push(b);
+                    stack.push(b.clone());
                     stack.push(a);
                     stack.push(b);
                 } else {
@@ -223,22 +649,28 @@ fn execute_tokens(tokens: &Vec<Token>, out_of_free_runs: bool) -> Vec<i32> {
             }
             Token::Print => {
                 if let Some(a) = stack.pop() {
-                    if let Some(stack_last_u32) = a.try_into().ok()
-                        && let Some(chr) = char::from_u32(stack_last_u32)
-                    {
-                        print!("{chr}");
-                        match stdout.flush() {
-                            Ok(()) => {}
-                            Err(err) => report_error(format!("Couldn't flush stdout because apparently {err}").as_str()),
-                        }
-                    } else {
-                        report_error("Failed to print character");
-                    }
+                    print!("{a}");
                 } else {
                     report_error("The stack must contain at least one element for it to be printed");
                 }
             }
+            Token::If(jump_addr) | Token::Elif(jump_addr) => {
+                if let Some(StackValue::Bool(boolean)) = stack.pop() {
+                    if !boolean {
+                        i = *jump_addr;
+                        continue;
+                    }
+                } else {
+                    report_error("If needs one boolean to be on the stack");
+                }
+            }
+            Token::Filif(jump_addr) | Token::Else(jump_addr) => {
+                i = *jump_addr;
+                continue;
+            }
+            token => todo!("Not yet impld {token:?}"),
         }
+        i += 1;
     }
     println!();
     stack
@@ -673,16 +1105,8 @@ fn sillyness(save_data: &mut SaveData) {
                 .with_validator(password_validator)
                 .prompt()
                 .expect("Enter a password");
-            let password_repetition = inquire::Password::new("Repeat your password: ")
-                .without_confirmation()
-                .with_validator(password_validator)
-                .prompt()
-                .expect("Enter a password");
-            let password_repetition2 = inquire::Password::new("Repeat your password again: ")
-                .without_confirmation()
-                .with_validator(password_validator)
-                .prompt()
-                .expect("Enter a password");
+            let password_repetition = inquire::Password::new("Repeat your password: ").without_confirmation().prompt().expect("Enter a password");
+            let password_repetition2 = inquire::Password::new("Repeat your password again: ").without_confirmation().prompt().expect("Enter a password");
 
             if !(password == password_repetition && password_repetition == password_repetition2 && password == password_repetition2) {
                 report_error("Your passwords do not match!");
@@ -814,10 +1238,13 @@ fn sillyness(save_data: &mut SaveData) {
                             continue;
                         }
                         let temp = ok.content_length().unwrap_or(test_file.1);
-                        let _ = std::fs::write("/dev/null", ok.text().unwrap_or_else(|_| String::new())); // This write is stupid because it shouldn't need to be here. It just won't
-                                                                                                          // measure any download speed otherwise and since the file is "empty" it
-                                                                                                          // doesn't actually print anything. But I'm leaving it here because I feel
-                                                                                                          // it fits with the feel of the program
+                        let _ = std::hint::black_box(ok.text().unwrap_or_else(|_| String::new()));
+                        // let _ = std::fs::write("/dev/null", ok.text().unwrap_or_else(|_|
+                        // String::new())); // This write is stupid because it shouldn't need to be
+                        // here. It just won't measure any download speed
+                        // otherwise and since the file is "empty" it
+                        // doesn't actually print anything. But I'm leaving it here because I feel
+                        // it fits with the feel of the program
                         temp
                     }
                     Err(_err) => {
