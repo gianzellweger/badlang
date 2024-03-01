@@ -72,7 +72,7 @@ Or with three numbers:
 
 ### Comments
 
-You can start a comment using `coment` and stop it using `no_coment`.
+You can start a comment using `comment` and stop it using `no_comment`.
 
 ## Contributing
 

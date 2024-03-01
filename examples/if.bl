@@ -1,0 +1,26 @@
+true if
+	'Working!' print
+fi
+
+
+false if
+	'Not_working!' print
+else
+	'Working!' print
+fi
+
+
+false if
+	'Not_working!' print
+filif true elif
+	'Working!' print
+fi
+
+
+false if
+	'Not_working!' print
+filif false elif
+	'Not_working!' print
+else
+	'Working!' print
+fi
