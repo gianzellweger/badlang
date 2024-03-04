@@ -15,28 +15,33 @@
 #![allow(clippy::cast_possible_wrap)]
 
 use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
+    collections::{HashMap},
+//     io::Write,
     path::PathBuf,
-    sync::Mutex,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+//     sync::Mutex,
+//     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2,
-};
+// use argon2::{
+//     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+//     Argon2,
+// };
 use colored::Colorize;
 use geocoding::Reverse;
-use inquire::{validator::Validation, CustomUserError};
+// use inquire::{validator::Validation, CustomUserError};
 use itertools::Itertools;
-use rand::distributions::Distribution;
+// use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
 
 #[macro_use]
 extern crate savefile_derive;
+
+mod microservices;
+mod tutorial;
+
+use microservices as ms;
 
 fn report_error(string: &str) -> ! {
     panic!("{}: {string}", "ERROR".bold().red());
@@ -388,6 +393,10 @@ fn parse_file(path: &PathBuf) -> Vec<Token> {
             report_error(format!("File could not be read because {err}").as_str());
         }
     };
+    parse_string(contents)
+}
+
+fn parse_string(contents: String) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut if_statements: Vec<usize> = Vec::with_capacity(4); // People are gonna wanna nest at least four times.
     let mut elif_statements: HashMap<usize, usize> = HashMap::new();
@@ -676,285 +685,7 @@ fn execute_tokens(tokens: &[Token], out_of_free_runs: bool) -> Vec<StackValue> {
     stack
 }
 
-// This part of the program serves absolutely no reason is just here
-// because I find it incredibly funny. More about the motivation can be read here: https://github.com/gianzellweger/badlang/blob/release/MOTIVATION.md
-
-// List of "features" and a roadmap can be found at https://github.com/gianzellweger/badlang/issues/3
-
-#[derive(EnumCountMacro, Debug, PartialEq, Eq)]
-enum Advertisement {
-    Temu,
-    Shein,
-    BetterHelp,
-    Nestle,
-    JohnsonJohnson,
-    CocaCola,
-    McDonalds,
-}
-
-// This is satire, but mostly based in fact. I encourage you to correct me
-// if any newer information surfaces. I also encourage you to include more
-// examples if there are more current ones.
-impl std::fmt::Display for Advertisement {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::Temu => "You support slave labor and genocide? Buy from our sponsor Temu!",
-            Self::Shein => "You support exploiting small designers, genocide and slave labor? Buy clothes from our sponsor Shein!",
-            Self::BetterHelp => "You want Facebook to have your sensitive medical records? Get online therapy from our sponsor BetterHelp!",
-            Self::Nestle => "You enjoy stealing the water of African villages, bottling it and then selling it to them? Buy from our sponsor Nestlé!",
-            Self::JohnsonJohnson => "You enjoy getting even richer by letting people in third-world countries die? Buy drugs from our sponsor Johnson & Johnson!",
-            Self::CocaCola => "You enjoy infesting our seas with microplastics? Buy a refreshing beverage from our sponsor Coca-Cola!",
-            Self::McDonalds => "You support McDonalds? Go shop at McDonalds!",
-        })
-    }
-}
-
-impl Distribution<Advertisement> for rand::distributions::Standard {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Advertisement {
-        static_assertions::const_assert_eq!(Advertisement::COUNT, 7); // If the match below isn't updated when a new Advertisement is added, it
-                                                                      // won't be added to the rotation
-        match rng.gen_range(0..Advertisement::COUNT) {
-            0 => Advertisement::Temu,
-            1 => Advertisement::Shein,
-            2 => Advertisement::BetterHelp,
-            3 => Advertisement::Nestle,
-            4 => Advertisement::JohnsonJohnson,
-            5 => Advertisement::CocaCola,
-            6 => Advertisement::McDonalds,
-            _ => unreachable!(),
-        }
-    }
-}
-
-#[allow(dead_code)]
-#[allow(clippy::needless_pass_by_value)]
-#[tauri::command]
-fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
-    static VELOCITY: Mutex<(i32, i32)> = Mutex::new((4, 4));
-    static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
-
-    let (screen_x, screen_y) = window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .map(|monitor| *monitor.size())
-        .map_or((1920, 1080), |pos| (pos.height as i32, pos.width as i32));
-
-    let mut position = POSITION.lock().expect("Unreachable");
-    let mut velocity = VELOCITY.lock().expect("Unreachable");
-    if position.0 > screen_x || position.0 < 0 {
-        velocity.0 = -velocity.0;
-    }
-    if position.1 > screen_y || position.1 < 0 {
-        velocity.1 = -velocity.1;
-    }
-
-    position.0 += velocity.0;
-    position.1 += velocity.1;
-    drop(velocity);
-
-    let _ = window.set_position(tauri::Position::Physical((*position).into()));
-    drop(position);
-
-    let _ = window.set_focus();
-}
-
-#[derive(Savefile, Clone, Debug)]
-struct Account {
-    name:               String,
-    // Yes I am actually taking a programming account (that doesn't do anything) serious enough to actually use encryption.
-    password_hash:      String,
-    version:            String,
-    google_auth_secret: String,
-}
-
-#[derive(Savefile, Clone, Debug, Default)]
-struct SaveData {
-    account:           Option<Account>,
-    runs_so_far:       usize,
-    last_update:       u64,  // This is in seconds since UNIX_EPOCH
-    dialogs_displayed: bool, // It makes sense to display them only once per device, as this is how it works in serious applications.
-}
-
-// These files are used to measure download speed. There are multiple
-// because there are actual server outages and I don't want people to miss
-// out on this one just because of such a tiny problem
-const TEST_FILE: [(&str, u64); 4] = [
-    ("https://speed.hetzner.de/100MB.bin", 100_000_000),
-    ("https://ash-speed.hetzner.com/100MB.bin", 100_000_000),
-    ("https://hel1-speed.hetzner.com/100MB.bin", 100_000_000),
-    ("https://fsn1-speed.hetzner.com/100MB.bin", 100_000_000),
-];
-
-// The cookies don't actually do anything. Yet.
-const TYPES_OF_COOKIES: [&str; 25] = [
-    "Authentication Cookies",
-    "Personalization Cookies",
-    "Shopping Cart Cookies",
-    "Analytics Cookies",
-    "Ad Targeting Cookies",
-    "Session Management Cookies",
-    "Security Cookies",
-    "Performance Cookies",
-    "Social Media Integration Cookies",
-    "Localization Cookies",
-    "Predictive Preference Cookies",
-    "Enhanced Virtual Reality Cookies",
-    "Celebrity Influence Cookies",
-    "Historical Context Cookies",
-    "Multiverse Browsing Cookies",
-    "Visual Communication Cookies",
-    "Extraterrestrial Inspiration Cookies",
-    "Mood Enhancement Cookies",
-    "Future Trend Cookies",
-    "Personalized Insights Cookies",
-    "Predictive Health Cookies",
-    "Behavioral Employment Cookies",
-    "Government Compliance Cookies",
-    "Mood Manipulation Cookies",
-    "Social Credit Cookies",
-];
-
-// These Terms of Service are not actually legally binding, refer to the
-// license for the actual legalese, don't sue me, etc.
-const TERMS_OF_SERVICE: &str = r#"Terms of Service
-
-1. Acceptance of Terms
-By continuing to read these musings, you agree to acknowledge the lighthearted nature of the content. If, however, you find yourself questioning the validity of our statements, consider this your cue to exit stage left.
-
-2. Changes to Terms
-We reserve the right to evolve these "Terms" at our discretion. Changes may occur without notice, and users will navigate the subtle shifts in the landscape unassisted.
-
-3. User Accounts
-Creating a user account involves a process known only to a select few. Your password is stored in a secure vault, accessible only to those who possess the secret passphrase.
-
-4. Content
-You can't post any content on BadLang™. Please exercise discretion, as some forms of expression may be subject to interpretation by our team of resident enigmatologists.
-
-5. Intellectual Property
-BadLang™ and its features belong to the collective imagination. Attempts to assert ownership may lead to a journey through the labyrinthine corridors of paradoxes and riddles.
-
-6. Termination
-We reserve the right to limit access to BadLang™. Banishment may lead you to discover other realms, where the unknown becomes the known.
-
-7. Governing Law
-These "Terms" are subject to the laws of Wakanda. In the event of any disputes, resolutions may be found in the concealed archives of ancient wisdom.
-
-8. Contact Us
-For inquiries about these enigmatic Terms, submit your questions through channels familiar to those initiated into the subtleties of subtle communication.
-
-ChatGPT
-BadLang™ Legal Team
-
-To accept, please type: 
-I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions
-"#;
-
-// Note: this is distinct from the text above in one very important way:
-// These spaces are actually spaces, while the ones above are the Unicode
-// character U+2002, which looks identical. This is to prevent copying.
-const ACCEPTANCE_PHRASE: &str = "I solemnly declare that I've thoroughly read and understood the Terms of Service, and I'm committed to adhering to its provisions";
-
-const CHANCE_OF_SERVER_MAINTENANCE: f64 = 0.1; // Also known as 10%
-
-const FREE_RUNS: usize = 5;
-
-const UPDATE_SIZE: u64 = 1_000_000_000; // 1GB
-const UPDATE_VARIATION: u64 = 300_000_000; // 300MB
-const DOWNLOAD_SPEED_VARIATION: f64 = 0.8; // 80%
-const DOWNLOAD_UPDATE_INTERVAL: f64 = 0.5; // This is in seconds
-
-const FIRST_OPTION: &str = "Yes, proceed to login";
-const SECOND_OPTION: &str = "No, proceed to signup";
-
-fn fetch_data(url: &str) -> Option<Vec<String>> {
-    // Make a blocking GET request
-    let response = reqwest::blocking::get(url).ok()?;
-
-    // Check if the request was successful (status code 200 OK)
-    if response.status().is_success() {
-        // Read the response body as a string
-        let body = response.text().ok()?;
-
-        // Split the data by new-line
-        let lines: Vec<String> = body.lines().map(String::from).collect();
-
-        Some(lines)
-    } else {
-        // If the request was not successful, return an error
-        None
-    }
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn password_validator(password: &str) -> Result<Validation, CustomUserError> {
-    static TOP_100_PASSWORDS: Mutex<Option<Vec<String>>> = Mutex::new(None);
-
-    // Yes this is very much a stolen idea from the Password game. I thought
-    // it's a nice nod to the game after basically copying half its
-    // concept
-    let todays_wordle_answer = reqwest::blocking::get(format!("https://www.nytimes.com/svc/wordle/v2/{}.json", chrono::offset::Local::now().date_naive().format("%Y-%m-%d"))).map_or(None, |res| {
-        match res.json::<serde_json::Value>() {
-            Ok(serde_json::Value::Object(map)) => match map.get("solution") {
-                Some(serde_json::Value::String(solution)) => Some(solution.clone()),
-                _ => None,
-            },
-            _ => None,
-        }
-    });
-
-    let mut top_100_passwords = TOP_100_PASSWORDS.lock().expect("Unreachable");
-
-    if top_100_passwords.is_none() {
-        *top_100_passwords =
-            Some(fetch_data("https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-10000.txt").unwrap_or_default());
-    };
-
-    let password_list = if top_100_passwords.as_ref().is_some_and(Vec::is_empty) {
-        None
-    } else {
-        top_100_passwords.as_ref()
-    };
-
-    Ok(if password.is_empty() {
-        Validation::Invalid("The password is required".into())
-    } else if password.chars().count() < 18 {
-        Validation::Invalid("Your password needs to be at least 18 characters long".into())
-    } else if password.chars().count() > 26 {
-        Validation::Invalid("Your password cannot exceed 26 characters".into())
-    } else if password.chars().any(char::is_whitespace) {
-        Validation::Invalid("Your password may not contain any whitespace".into())
-    } else if !password.chars().any(char::is_uppercase) {
-        Validation::Invalid("Your password must contain an uppercase letter".into())
-    } else if !password.chars().any(char::is_lowercase) {
-        Validation::Invalid("Your password must contain a lowercase letter".into())
-    } else if !password.chars().any(|c| c.is_ascii_digit()) {
-        Validation::Invalid("Your password must contain a number".into())
-    } else if password.chars().all(char::is_alphanumeric) {
-        Validation::Invalid("Your password must contain a special character".into())
-    } else if !password.chars().any(|c| unic_emoji_char::is_emoji(c) && !c.is_ascii()) {
-        Validation::Invalid("Your password must contain an emoji".into())
-    } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
-        Validation::Invalid("Your password may not contain duplicate characters".into())
-    } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
-        Validation::Invalid("Your password may not contain any well known sequences".into())
-    } else if let Some(wordle_answer) = todays_wordle_answer.as_ref()
-        && !password.to_lowercase().contains(wordle_answer.to_lowercase().as_str())
-        && wordle_answer.chars().collect::<HashSet<_>>().len() == wordle_answer.len()
-    {
-        Validation::Invalid("Your password must contain today's wordle answer".into())
-    } else if let Some(passwords) = password_list
-        && let Some(part) = passwords.iter().find(|&pw| password.contains(pw))
-        && let Some(wordle_answer) = todays_wordle_answer
-        && !passwords.contains(&wordle_answer)
-    {
-        Validation::Invalid(format!("Your password contains one of the top 100 most common passwords, '{part}', making it insecure").into())
-    } else {
-        Validation::Valid
-    })
-}
-
-fn sillyness(save_data: &mut SaveData) {
+fn sillyness(save_data: &mut ms::SaveData) {
     // This macos version panics for some reason currently. This code should
     // theoretically work, tauri is just buggy. #[cfg(target_os = "macos")]
     // {
@@ -963,7 +694,7 @@ fn sillyness(save_data: &mut SaveData) {
     // on another thread. You need to quit it to continue!"
     //     );
     //     let mut app = tauri::Builder::default()
-    //         .invoke_handler(tauri::generate_handler!(tauri_handler))
+    //         .invoke_handler(tauri::generate_handler!(ms::tauri_handler))
     //         .build(tauri::generate_context!())
     //         .expect("error while building tauri application");
 
@@ -979,7 +710,7 @@ fn sillyness(save_data: &mut SaveData) {
     jod_thread::spawn(|| {
         tauri::Builder::default()
             .any_thread()
-            .invoke_handler(tauri::generate_handler!(tauri_handler))
+            .invoke_handler(tauri::generate_handler!(ms::tauri_handler))
             .build(tauri::generate_context!())
             .expect("error while building tauri application")
             .run(|_app_handle, event| {
@@ -990,49 +721,14 @@ fn sillyness(save_data: &mut SaveData) {
     })
     .detach();
 
-    let has_internet = reqwest::blocking::get("https://google.com").is_ok(); // Googles servers are always up so I'm using them
-    if !has_internet {
-        report_error("To use this programming language, you need an internet connection!");
-    }
+    ms::has_internet();
+    ms::server_outage();
 
-    if fastrand::f64() <= CHANCE_OF_SERVER_MAINTENANCE {
-        report_error("Our servers are currently experiencing outages, but we are working hard to get them back online!");
-    }
-
-    let save_data_clone = save_data.clone();
+    let dialogs_displayed = save_data.dialogs_displayed;
     #[cfg(not(all(target_os = "macos", not(debug_assertions))))] // The dialogs currently segfault on intel macs
     jod_thread::spawn(move || {
-        if !save_data_clone.dialogs_displayed {
-            let _ = native_dialog::MessageDialog::new()
-                .set_type(native_dialog::MessageType::Warning)
-                .set_title("BadLang™")
-                .set_text(r#""BadLang™" wants to access your contacts. Allow?"#)
-                .show_confirm();
-            let _ = native_dialog::MessageDialog::new()
-                .set_type(native_dialog::MessageType::Warning)
-                .set_title("BadLang™")
-                .set_text(r#""BadLang™" wants to access your location. Allow?"#)
-                .show_confirm();
-            let _ = native_dialog::MessageDialog::new()
-                .set_type(native_dialog::MessageType::Warning)
-                .set_title("BadLang™")
-                .set_text(r#""BadLang™" wants to make and receive phone calls on your behalf. Allow?"#)
-                .show_confirm();
-            let _ = native_dialog::MessageDialog::new()
-                .set_type(native_dialog::MessageType::Warning)
-                .set_title("BadLang™")
-                .set_text(r#""BadLang™" wants to manage incoming network connections. Allow?"#)
-                .show_confirm();
-            let _ = native_dialog::MessageDialog::new()
-                .set_type(native_dialog::MessageType::Warning)
-                .set_title("BadLang™")
-                .set_text(r#""BadLang™" wants to access your passwords. Allow?"#)
-                .show_confirm();
-            let _ = native_dialog::MessageDialog::new()
-                .set_type(native_dialog::MessageType::Warning)
-                .set_title("BadLang™")
-                .set_text(r#""BadLang™" wants to access your liver. Allow?"#)
-                .show_confirm();
+        if !dialogs_displayed {
+            ms::show_dialogs();
         }
     })
     .detach();
@@ -1041,273 +737,13 @@ fn sillyness(save_data: &mut SaveData) {
         save_data.dialogs_displayed = true;
     }
 
-    let _ = notify_rust::Notification::new()
-        .summary("Do you want to subscribe to our mailing list?")
-        .body("Shoot an email to mailinglist@badlang.dev and you will automatically be added to the mailing list!")
-        .appname("Mailing List Subscriber")
-        .auto_icon()
-        .sound_name("alarm-clock-elapsed")
-        .timeout(0)
-        .show(); // This notification will not go away unless you dismiss it.
-
-    let random_advertisement: Advertisement = rand::random();
-
-    println!("{}", random_advertisement.to_string().yellow().on_purple().bold());
-
-    let accepted_cookies = match inquire::Select::new("This programming language uses cookies.", vec!["Accept all", "Customize"])
-        .without_help_message()
-        .prompt()
-        .expect("What")
-    {
-        "Customize" => inquire::MultiSelect::new("Select the kind of cookies you want", TYPES_OF_COOKIES.to_vec())
-            .without_help_message()
-            .with_default((0..25).collect::<Vec<_>>().as_slice())
-            .prompt()
-            .expect("No"),
-        _ => TYPES_OF_COOKIES.to_vec(),
-    };
-
-    if !accepted_cookies.is_empty() {
-        println!("The types of cookies you accepted are:");
-        for cookie in accepted_cookies {
-            println!("- {cookie}");
-        }
-    }
-
-    println!();
-
-    let argon2 = Argon2::default();
-
-    match inquire::Select::new("To use this programming language, you need a BadLang™ Account. Do you already have one?", vec![
-        FIRST_OPTION,
-        SECOND_OPTION,
-    ])
-    .without_help_message()
-    .prompt()
-    .expect("What")
-    {
-        SECOND_OPTION => {
-            let name = inquire::Text::new("Enter your username: ")
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(16))
-                .with_validator(|name: &str| {
-                    Ok(if name.chars().all(|c| c.is_lowercase() || c.is_ascii_digit() || c == '.' || c == '_') {
-                        Validation::Valid
-                    } else {
-                        Validation::Invalid("Usernames may only contain lowercase letters, numbers, underscores and dashes".into())
-                    })
-                })
-                .prompt()
-                .expect("Enter your username");
-
-            let password = inquire::Password::new("Enter your password: ")
-                .without_confirmation()
-                .with_validator(password_validator)
-                .prompt()
-                .expect("Enter a password");
-            let password_repetition = inquire::Password::new("Repeat your password: ").without_confirmation().prompt().expect("Enter a password");
-            let password_repetition2 = inquire::Password::new("Repeat your password again: ").without_confirmation().prompt().expect("Enter a password");
-
-            if !(password == password_repetition && password_repetition == password_repetition2 && password == password_repetition2) {
-                report_error("Your passwords do not match!");
-            }
-
-            let salt = SaltString::generate(&mut OsRng);
-            let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
-
-            let ga = google_authenticator::GoogleAuthenticator::new();
-            let secret = ga.create_secret(32);
-            let mut qr_code_url = ga.qr_code_url(secret.as_str(), name.as_str(), "Badlang™", 500, 500, google_authenticator::ErrorCorrectionLevel::High);
-            qr_code_url = qr_code_url.replace('|', "%7C");
-            let _ = open::that(qr_code_url);
-
-            print!("A QR-code with your Google Authenticator code just opened in your browser. Do scan it, because it will never ever be available again! Press enter as soon as you're ready ");
-            let _ = std::io::stdout().flush();
-            {
-                let mut buffer = String::new();
-                let stdin = std::io::stdin();
-                let _ = stdin.read_line(&mut buffer);
-            }
-
-            inquire::Text::new(TERMS_OF_SERVICE)
-                .with_validator(|v: &str| {
-                    if v == ACCEPTANCE_PHRASE {
-                        Ok(Validation::Valid)
-                    } else if v == ACCEPTANCE_PHRASE.replace(' ', " ") {
-                        Ok(Validation::Invalid("You can't just copy-paste and expect it to work!".into()))
-                    } else {
-                        Ok(Validation::Invalid("Incorrect text!".into()))
-                    }
-                })
-                .prompt()
-                .expect("Enter the phrase");
-
-            save_data.account = Some(Account {
-                name,
-                password_hash,
-                version: semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string(),
-                google_auth_secret: secret,
-            });
-            println!("{}! Account saved!", "SUCCESS".green());
-        }
-        FIRST_OPTION => {
-            let Some(account) = save_data.account.as_ref() else {
-                report_error("You do in fact not have an account");
-            };
-
-            let name = inquire::Text::new("Enter your username: ")
-                .with_validator(inquire::required!())
-                .with_validator(inquire::min_length!(16))
-                .prompt()
-                .expect("Enter your username");
-
-            let password = inquire::Password::new("Enter your password: ").without_confirmation().prompt().expect("Enter a password");
-
-            let confirm_signs = ["✅", "✅", "✔️", "✓", "✔"];
-            let cancel_signs = [
-                "𝕏", "✗", "✘", "×", "Χ", "χ", "Х", "х", "╳", "☓", "✕", "✖", "❌", "❎", "⨉", "⨯", "🗙", "🗴", "🞨", "🞩", "🞪", "🞫", "🞬", "🞭", "🞮",
-            ];
-            let bool_formatter: inquire::formatter::BoolFormatter = &|boolean| if boolean { confirm_signs.as_slice().join("/") } else { cancel_signs.as_slice().join("/") };
-            let bool_parser: inquire::parser::BoolParser = &|string| {
-                if confirm_signs.as_slice().contains(&string) {
-                    Ok(true)
-                } else if cancel_signs.as_slice().contains(&string) {
-                    Ok(false)
-                } else {
-                    Err(())
-                }
-            };
-            // I want to draw your attention to the fact that this does in fact do
-            // nothing at all, like so many checkboxes of this type
-            inquire::Confirm::new("Remember password?")
-                .with_formatter(bool_formatter)
-                .with_parser(bool_parser)
-                .with_error_message(
-                    format!(
-                        "Type one of {} to accept and one of {} to decline",
-                        confirm_signs.as_slice().join("/"),
-                        cancel_signs.as_slice().join("/")
-                    )
-                    .as_str(),
-                )
-                .prompt()
-                .expect("Confirm or cancel");
-
-            let parsed_hash = PasswordHash::new(&account.password_hash).expect("Oh no");
-            if !(name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok()) {
-                report_error("Either your name or password were wrong. Try again!");
-            }
-
-            let auth_code = inquire::Text::new("Enter your Google Authenticator code:")
-                .with_validator(inquire::required!())
-                .with_validator(inquire::length!(6))
-                .prompt()
-                .expect("Enter your auth code");
-
-            let ga = google_authenticator::GoogleAuthenticator::new();
-
-            if !ga.verify_code(account.google_auth_secret.as_str(), auth_code.as_str(), 0, 0) {
-                report_error("Your auth code was wrong!");
-            }
-
-            println!("{}! Logged into your account!", "SUCCESS".green().bold());
-        }
-        _ => unreachable!(),
-    }
-
-    println!(
-        "{}",
-        "Follow us on Instagram and Twitter @badlang_dev and be sure to also give us a Github star ⭐️⭐️⭐️⭐️⭐️"
-            .bold()
-            .green()
-            .on_magenta()
-    );
-
-    if SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs() - save_data.last_update > (24 * 60 * 60) {
-        // These are for testing because this part of the code likes to break.
-        // if false {
-        // if true {
-        let update_size = fastrand::u64((UPDATE_SIZE - UPDATE_VARIATION)..(UPDATE_SIZE + UPDATE_VARIATION));
-        let (download_time, content_length) = {
-            let start = Instant::now();
-            let mut content_length = u64::MAX;
-            for test_file in TEST_FILE {
-                content_length = match reqwest::blocking::get(test_file.0) {
-                    Ok(ok) => {
-                        if ok.status().is_server_error() {
-                            continue;
-                        }
-                        let temp = ok.content_length().unwrap_or(test_file.1);
-                        let _ = std::hint::black_box(ok.text().unwrap_or_else(|_| String::new()));
-                        // let _ = std::fs::write("/dev/null", ok.text().unwrap_or_else(|_|
-                        // String::new())); // This write is stupid because it shouldn't need to be
-                        // here. It just won't measure any download speed
-                        // otherwise and since the file is "empty" it
-                        // doesn't actually print anything. But I'm leaving it here because I feel
-                        // it fits with the feel of the program
-                        temp
-                    }
-                    Err(_err) => {
-                        continue;
-                    }
-                };
-                break;
-            }
-            (start.elapsed(), content_length)
-        };
-        if content_length == u64::MAX {
-            report_error("There is an actual server error. For real this time");
-        }
-        let download_speed = content_length as f64 / download_time.as_secs_f64();
-        let mut progress = 0;
-        let progress_bar = indicatif::ProgressBar::new(update_size);
-        let mut iteration: usize = 0;
-        while progress < update_size {
-            let increment = fastrand::u64(
-                (((1.0 - DOWNLOAD_SPEED_VARIATION) * download_speed / DOWNLOAD_UPDATE_INTERVAL) as u64)..(((1.0 + DOWNLOAD_SPEED_VARIATION) * download_speed / DOWNLOAD_UPDATE_INTERVAL) as u64),
-            );
-            progress_bar.set_style(
-                indicatif::ProgressStyle::with_template(
-                    format!(
-                        "Downloading update{:<4} {{wide_bar}} {{bytes}}/{{total_bytes}} [{}/s]",
-                        ".".repeat((iteration % 3) + 1),
-                        humansize::format_size(increment, humansize::BINARY)
-                    )
-                    .as_str(),
-                )
-                .expect("This shouldn't fail"),
-            );
-            iteration += 1;
-            progress_bar.inc(increment);
-            progress += increment;
-            std::thread::sleep(std::time::Duration::from_secs_f64(DOWNLOAD_UPDATE_INTERVAL));
-        }
-        progress_bar.finish();
-        println!("Applying update...");
-        std::thread::sleep(std::time::Duration::from_secs(10)); // It's literally just constant.
-        save_data.last_update = SystemTime::now().duration_since(UNIX_EPOCH).expect("Damn bro what kinda system you running").as_secs();
-    }
-
-    let exec_name = std::env::args().next().expect("How did you manage this one again?");
-    save_data.runs_so_far += 1;
-    if save_data.runs_so_far < FREE_RUNS {
-        report_warning(
-            format!(
-                "You have used {} out of your {FREE_RUNS} free runs. Afterwards, the program will run on our bronze tier server infrastructure, unless you subscribe to either our gold or platinum \
-                 subscription tier. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`",
-                save_data.runs_so_far
-            )
-            .as_str(),
-        );
-    } else {
-        report_warning(
-            format!(
-                "You have used up all your free runs and your program will now run on our bronze tier server infrastructure. Subscribe to our gold or platinum tier to run your programs on your \
-                 device or on our gold tier server infrastructure. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`"
-            )
-            .as_str(),
-        );
-    }
+    ms::mailing_list_notification();
+    ms::advertisement();
+    ms::cookies();
+    ms::login(&mut save_data.account);
+    ms::self_promotion();
+    ms::update(&mut save_data.last_update);
+    ms::trial_message(&mut save_data.runs_so_far);
 }
 
 // The silly part is over. Thank god
@@ -1319,13 +755,21 @@ fn main() {
     }));
 
     let matches = clap::command!()
-        .arg(clap::arg!(<file> "The file to run").required(false).value_parser(clap::value_parser!(PathBuf))) // Yes it is required but it kinda isn't because subscribe.
+        .subcommands([
+            clap::Command::new("run")
+                .about("Run a program")
+                .arg(clap::arg!(<file> "The file to run").value_parser(clap::value_parser!(PathBuf)))
+                .arg(clap::arg!(--notroll).hide(true).required(false).value_parser(clap::value_parser!(bool))), /* This argument isn't really needed and potentially defeats the purpose of the
+                                                                                                                 * program but it is here so I can keep my sanity. */
+            clap::Command::new("tutorial")
+                .about("Unlock new language features")
+                .long_about("Unlock handy new features of the language in a playful sandbox where you learn to use them!"),
+        ])
         .arg(
             clap::arg!(-s --subscribe "Open the subscription plans in a browser")
                 .required(false)
                 .value_parser(clap::value_parser!(bool)),
         )
-        .arg(clap::arg!(--notroll).hide(true).required(false).value_parser(clap::value_parser!(bool))) // This argument isn't really needed and potentially defeats the purpose of the program but it is here so I can keep my sanity.
         .get_matches();
 
     if let Some(subscribe) = matches.get_one::<bool>("subscribe")
@@ -1335,48 +779,56 @@ fn main() {
         report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/");
     }
 
-    let out_of_free_runs = if let Some(no_troll) = matches.get_one::<bool>("notroll")
-        && !(*no_troll)
-    {
-        let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
-        savefile_path.push(".config");
-        savefile_path.push("badlang");
-        savefile_path.push("badlang.bin");
+    match matches.subcommand() {
+        Some(("run", run_matches)) => {
+            let out_of_free_runs = if let Some(no_troll) = run_matches.get_one::<bool>("notroll")
+                && !(*no_troll)
+            {
+                let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
+                savefile_path.push(".config");
+                savefile_path.push("badlang");
+                savefile_path.push("badlang.bin");
 
-        let mut save_data = match load_file::<SaveData, &PathBuf>(&savefile_path, 0) {
-            Ok(sd) => {
-                if sd
-                    .account
-                    .as_ref()
-                    .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
-                {
-                    sd
-                } else {
-                    report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
-                    SaveData::default()
+                let mut save_data = match load_file::<ms::SaveData, &PathBuf>(&savefile_path, 0) {
+                    Ok(sd) => {
+                        if sd
+                            .account
+                            .as_ref()
+                            .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
+                        {
+                            sd
+                        } else {
+                            report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
+                            ms::SaveData::default()
+                        }
+                    }
+                    Err(_) => ms::SaveData::default(),
+                };
+
+                sillyness(&mut save_data);
+
+                if let Some(parent_dir) = savefile_path.parent() {
+                    if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
+                        report_error(format!("Couldn't create savefile because {err}").as_str());
+                    }
                 }
-            }
-            Err(_) => SaveData::default(),
-        };
 
-        sillyness(&mut save_data);
+                save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
 
-        if let Some(parent_dir) = savefile_path.parent() {
-            if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
-                report_error(format!("Couldn't create savefile because {err}").as_str());
-            }
+                save_data.runs_so_far >= ms::FREE_RUNS
+            } else {
+                false
+            };
+
+            let tokens = run_matches.get_one::<PathBuf>("file").map_or_else(|| report_error("Please provide a path to run!"), parse_file);
+
+            execute_tokens(&tokens, out_of_free_runs);
         }
 
-        save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
-
-        save_data.runs_so_far >= FREE_RUNS
-    } else {
-        false
-    };
-
-    let tokens = matches.get_one::<PathBuf>("file").map_or_else(|| report_error("Please provide a path to run!"), parse_file);
-
-    execute_tokens(&tokens, out_of_free_runs);
+        Some(("tutorial", _)) => tutorial::tutorial(0),
+        Some((_, _)) => report_error("Invalid subcommand!"),
+        None => report_error("No subcommand"),
+    }
 }
 
 // Because I hate code splitting (not really, it just doesn't fit the feel
