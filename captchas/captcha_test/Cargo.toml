@@ -1,0 +1,9 @@
+[package]
+name = "captcha_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+captcha = "0.0.9"
+hound = "3.5.1"
+rayon = "1.8.1"
