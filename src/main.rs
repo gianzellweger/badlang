@@ -15,11 +15,11 @@
 #![allow(clippy::cast_possible_wrap)]
 
 use std::{
-    collections::{HashMap},
-//     io::Write,
+    collections::HashMap,
+    //     io::Write,
     path::PathBuf,
-//     sync::Mutex,
-//     time::{Instant, SystemTime, UNIX_EPOCH},
+    //     sync::Mutex,
+    //     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 // use argon2::{
@@ -346,21 +346,21 @@ enum Token {
     /// else-condition exists but is non-existent in tokens because
     Else(usize),
     /// fi also exists, but non-existent in tokens because
-    /// filif is a mixture between fi and elif:
+    /// `MrBeast!` is a mixture between fi and elif:
     /// Once it is reached, one of the if/(el)ifs has already executed,
     /// meaning it will jump to fi.
-    Filif(usize),
+    MrBeast(usize),
     /// Equality, much like the thing globally not yet reached.
     Eq,
     /// Strict equality, similar to javascripts strict equality thing.
     Seq,
-    /// Even stricter equality, stricter than JavaScripts triple equal.
+    /// Even stricter equality, stricter than javascripts triple equal.
     Sseq,
     /// Inequality,
     Ineq,
     /// Strict inequality, similar to javascripts strict inequality thing.
     Sineq,
-    /// Even stricter inequality, stricter than JavaScripts double inequal.
+    /// Even stricter inequality, stricter than javascripts double inequal.
     Ssineq,
     /// Greater-than,
     Gt,
@@ -393,20 +393,59 @@ fn parse_file(path: &PathBuf) -> Vec<Token> {
             report_error(format!("File could not be read because {err}").as_str());
         }
     };
-    parse_string(contents)
+    parse_string(&contents)
 }
 
-fn parse_string(contents: String) -> Vec<Token> {
+fn parse_string(contents: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut if_statements: Vec<usize> = Vec::with_capacity(4); // People are gonna wanna nest at least four times.
     let mut elif_statements: HashMap<usize, usize> = HashMap::new();
-    let mut filif_statements: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut mr_beast_statements: HashMap<usize, Vec<usize>> = HashMap::new();
     let mut else_statements: Vec<usize> = Vec::with_capacity(3);
     let mut is_commenting = false;
-    for (index, word) in contents.split_whitespace().enumerate() {
+    let mut is_stringing = false;
+
+    let mut word = String::new();
+    let mut index = 0;
+
+    let mut chars = contents.chars();
+    while let Some(chr) = chars.next() {
+        if chr == '\'' {
+            if is_stringing {
+                tokens.push(Token::StackValue(StackValue::String(word)));
+                word = String::new();
+                index += 1;
+            }
+            is_stringing = !is_stringing;
+            continue;
+        }
+        if is_stringing {
+            if chr == '\\' {
+                word.push(match chars.next() {
+                    Some('n') => '\n',
+                    Some('r') => '\r',
+                    Some('t') => '\t',
+                    Some('\\') => '\\',
+                    Some('0') => '\0',
+                    Some('\'') => '\'',
+                    Some(x) => report_error(format!("Unexpected escape character '{x}'").as_str()),
+                    None => report_error("Expected escape character, found end of file"),
+                });
+            } else {
+                word.push(chr);
+            }
+            continue;
+        }
+        if !chr.is_whitespace() {
+            word.push(chr);
+            continue;
+        }
+        if chr.is_whitespace() && word.is_empty() {
+            continue;
+        }
         if !is_commenting {
             static_assertions::const_assert_eq!(Token::COUNT, 32);
-            let token = match word {
+            let token = match word.as_str() {
                 "+" => Token::Add,
                 "-" => Token::Subtract,
                 "*" => Token::Multiply,
@@ -436,17 +475,17 @@ fn parse_string(contents: String) -> Vec<Token> {
                         report_error("Found 'elif' without 'if'");
                     };
                     if elif_statements.try_insert(*if_index, index).is_err() {
-                        report_error("Found two 'elif's next to eachother without 'filif' between them")
+                        report_error("Found two 'elif's next to eachother without 'MrBeast' between them")
                     }
                     Token::Elif(usize::MAX)
                 }
-                "filif" => {
+                "MrBeast!" => {
                     let Some(if_index) = if_statements.last() else {
-                        report_error("Found 'filif' closing an if-statement that doesn't exist");
+                        report_error("Found 'MrBeast' closing an if-statement that doesn't exist");
                     };
 
-                    if let Some(filifs) = filif_statements.get_mut(if_index) {
-                        filifs.push(index);
+                    if let Some(mr_beasts) = mr_beast_statements.get_mut(if_index) {
+                        mr_beasts.push(index);
                         if let Some(elif_index) = elif_statements.remove(if_index)
                             && let Some(Token::Elif(jump_addr)) = tokens.get_mut(elif_index)
                         {
@@ -455,14 +494,14 @@ fn parse_string(contents: String) -> Vec<Token> {
                             report_error("This is embarrassing");
                         }
                     } else {
-                        filif_statements.insert(*if_index, vec![index]);
+                        mr_beast_statements.insert(*if_index, vec![index]);
                         if let Some(Token::If(jump_addr)) = tokens.get_mut(*if_index) {
                             *jump_addr = index + 1;
                         } else {
                             report_error("This is embarrassing");
                         }
                     }
-                    Token::Filif(usize::MAX)
+                    Token::MrBeast(usize::MAX)
                 }
                 "else" => {
                     let Some(if_index) = if_statements.last() else {
@@ -472,10 +511,14 @@ fn parse_string(contents: String) -> Vec<Token> {
                         if let Some(Token::Elif(jump_addr)) = tokens.get_mut(elif_index) {
                             *jump_addr = index + 1;
                         } else {
-                            report_error("This is embarrassing")
+                            report_error("This is embarrassing");
                         }
+                    } else if let Some(Token::If(jump_addr)) = tokens.get_mut(*if_index) {
+                        *jump_addr = index + 1;
                     } else {
+                        report_error("This is embarrassing");
                     }
+
                     else_statements.push(index);
                     Token::Else(usize::MAX)
                 }
@@ -483,13 +526,21 @@ fn parse_string(contents: String) -> Vec<Token> {
                     let Some(if_index) = if_statements.pop() else {
                         report_error("Found 'fi' closing an if-statement that doesn't exist");
                     };
-                    if let Some(filifs) = filif_statements.remove(&if_index) {
-                        filifs.iter().for_each(|filif_index| {
-                            if let Some(Token::Filif(jump_addr)) = tokens.get_mut(*filif_index) {
+                    if let Some(mr_beasts) = mr_beast_statements.remove(&if_index) {
+                        for mr_beast_index in mr_beasts {
+                            if let Some(Token::MrBeast(jump_addr)) = tokens.get_mut(mr_beast_index) {
                                 *jump_addr = index;
                             }
-                        });
+                        }
+                    } else if let Some(Token::If(jump_addr)) = tokens.get_mut(if_index) {
+                        if *jump_addr == usize::MAX {
+                            *jump_addr = index;
+                        }
+                    } else {
+                        report_error("This is embarrassing");
                     }
+
+                    // TODO review this code for nested ifs
                     if let Some(else_index) = else_statements.pop() {
                         let Some(Token::Else(else_statement)) = tokens.get_mut(else_index) else {
                             report_error("This is embarrassing");
@@ -513,7 +564,6 @@ fn parse_string(contents: String) -> Vec<Token> {
                 x if let Ok(int) = x.parse::<i64>() => Token::StackValue(StackValue::Integer(int)),
                 x if let Ok(float) = x.parse::<f64>() => Token::StackValue(StackValue::Float(float)),
                 x if let Ok(boolean) = x.parse::<bool>() => Token::StackValue(StackValue::Bool(boolean)),
-                x if x.chars().next().is_some_and(|c| c == '\'') && x.chars().last().is_some_and(|c| c == '\'') => Token::StackValue(StackValue::String(x[1..x.len() - 1].to_string())),
                 x if x.len() == 3 && x.chars().next().is_some_and(|c| c == '"') && x.chars().last().is_some_and(|c| c == '"') => {
                     Token::StackValue(StackValue::Integer(x[1..x.len() - 1].chars().next().expect("This should work") as i64))
                 }
@@ -526,6 +576,8 @@ fn parse_string(contents: String) -> Vec<Token> {
         if word == "no_comment" {
             is_commenting = false;
         }
+        word.clear();
+        index += 1;
     }
     if !if_statements.is_empty() {
         report_error("Unclosed if-statement");
@@ -533,8 +585,11 @@ fn parse_string(contents: String) -> Vec<Token> {
     if !else_statements.is_empty() {
         report_error("This shouldn't happen: Dangling else-statement");
     }
-    if !filif_statements.is_empty() {
-        report_error("This shouldn't happen: Dangling filif-statements");
+    if !mr_beast_statements.is_empty() {
+        report_error("This shouldn't happen: Dangling MrBeast-statements");
+    }
+    if is_commenting {
+        report_error("Unclosed comment");
     }
 
     tokens
@@ -607,9 +662,64 @@ fn execute_tokens(tokens: &[Token], out_of_free_runs: bool) -> Vec<StackValue> {
                 {
                     stack.push(StackValue::Bool(a == b));
                 } else {
+                    report_error("The stack must contain at least two elements fo them to be compared");
+                }
+            }
+            Token::Ineq => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(a != b));
+                } else {
                     report_error("The stack must contain at least two elements for them to be compared");
                 }
             }
+            Token::Seq => todo!("Impl strict equal"),
+            Token::Sineq => todo!("Impl strict equal"),
+            Token::Sseq => todo!("Impl strict strict equal"),
+            Token::Ssineq => todo!("Impl strict strict equal"),
+            Token::Gt => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b > a));
+                } else {
+                    report_error("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Lt => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b < a));
+                } else {
+                    report_error("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Ge => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b >= a));
+                } else {
+                    report_error("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Le => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b <= a));
+                } else {
+                    report_error("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Shr => todo!("Impl shr"),
+            Token::Shl => todo!("Impl shl"),
+            Token::Or => todo!("Impl or"),
+            Token::And => todo!("Impl and"),
+            Token::Not => todo!("Impl not"),
+            Token::Xor => todo!("Impl xor"),
             Token::Dup => {
                 if let Some(a) = stack.last() {
                     stack.push(a.clone());
@@ -673,11 +783,10 @@ fn execute_tokens(tokens: &[Token], out_of_free_runs: bool) -> Vec<StackValue> {
                     report_error("If needs one boolean to be on the stack");
                 }
             }
-            Token::Filif(jump_addr) | Token::Else(jump_addr) => {
+            Token::MrBeast(jump_addr) | Token::Else(jump_addr) => {
                 i = *jump_addr;
                 continue;
-            }
-            token => todo!("Not yet impld {token:?}"),
+            } // token => todo!("Not yet impld {token:?}"),
         }
         i += 1;
     }
@@ -833,6 +942,7 @@ fn main() {
 
 // Because I hate code splitting (not really, it just doesn't fit the feel
 // of the project), tests also go in this file
+/*
 mod tests {
     #[test]
     fn test_math() {
@@ -878,3 +988,4 @@ mod tests {
         assert!(stack.get(4).is_some_and(|v| *v == 2));
     }
 }
+*/

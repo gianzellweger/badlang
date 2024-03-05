@@ -1,26 +1,40 @@
 true if
-	'Working!' print
+	'Working!\n' print
 fi
 
 
 false if
-	'Not_working!' print
+	'Not working!\n' print
 else
-	'Working!' print
+	'Working!\n' print
 fi
 
 
 false if
-	'Not_working!' print
-filif true elif
-	'Working!' print
+	'Not working!\n' print
+MrBeast! true elif
+	'Working!\n' print
 fi
 
 
 false if
-	'Not_working!' print
-filif false elif
-	'Not_working!' print
+	'Not working!\n' print
+MrBeast! false elif
+	'Not working!\n' print
 else
-	'Working!' print
+	'Working!\n' print
+fi
+
+
+false if
+	false if
+		'Not working!\n' print
+	else
+		'Not working!\n' print
+	fi
+	'Not working!\n' print
+MrBeast! false elif
+	'Not working!\n' print
+else
+	'Working!\n' print
 fi
