@@ -14,23 +14,11 @@
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_possible_wrap)]
 
-use std::{
-    collections::HashMap,
-    //     io::Write,
-    path::PathBuf,
-    //     sync::Mutex,
-    //     time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, path::PathBuf};
 
-// use argon2::{
-//     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-//     Argon2,
-// };
 use colored::Colorize;
 use geocoding::Reverse;
-// use inquire::{validator::Validation, CustomUserError};
 use itertools::Itertools;
-// use rand::distributions::Distribution;
 use savefile::prelude::*;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
