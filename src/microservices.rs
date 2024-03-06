@@ -3,16 +3,12 @@
 
 // List of "features" and a roadmap can be found at https://github.com/gianzellweger/badlang/issues/3
 
-
 use std::{
-    collections::{HashSet},
+    collections::HashSet,
     io::Write,
     sync::Mutex,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-
-use crate::report_error;
-use crate::report_warning;
 
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -23,6 +19,8 @@ use inquire::{validator::Validation, CustomUserError};
 use rand::distributions::Distribution;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
+
+use crate::{report_error, report_warning};
 
 #[derive(EnumCountMacro, Debug, PartialEq, Eq)]
 pub enum Advertisement {
@@ -543,6 +541,7 @@ pub fn update(last_update: &mut u64) {
         // These are for testing because this part of the code likes to break.
         // if false {
         // if true {
+        println!("Beginning update process...");
         let update_size = fastrand::u64((UPDATE_SIZE - UPDATE_VARIATION)..(UPDATE_SIZE + UPDATE_VARIATION));
         let (download_time, content_length) = {
             let start = Instant::now();
@@ -611,8 +610,8 @@ pub fn trial_message(runs_so_far: &mut usize) {
     if *runs_so_far < FREE_RUNS {
         report_warning(
             format!(
-                "You have used {runs_so_far} out of your {FREE_RUNS} free runs. Afterwards, the program will run on our bronze tier server infrastructure, unless you subscribe to either our gold or platinum \
-                 subscription tier. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`",
+                "You have used {runs_so_far} out of your {FREE_RUNS} free runs. Afterwards, the program will run on our bronze tier server infrastructure, unless you subscribe to either our gold or \
+                 platinum subscription tier. You can open the subscription plans using `{exec_name} -s` or `{exec_name} --subscribe`",
             )
             .as_str(),
         );
