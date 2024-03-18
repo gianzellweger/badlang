@@ -404,7 +404,7 @@ pub fn login(account: &mut Option<Account>) {
                     Ok(if name.chars().all(|c| c.is_lowercase() || c.is_ascii_digit() || c == '.' || c == '_') {
                         Validation::Valid
                     } else {
-                        Validation::Invalid("Usernames may only contain lowercase letters, numbers, underscores and dashes".into())
+                        Validation::Invalid("Usernames may only contain lowercase letters, numbers, underscores and dots".into())
                     })
                 })
                 .prompt()
