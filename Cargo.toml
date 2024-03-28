@@ -19,7 +19,7 @@ tauri-build = { version = "1.5.1", features = [] }
 [dependencies]
 argon2 = "0.5.3"
 captcha = "0.0.9"
-chrono = { version = "0.4.35", features = ["alloc"] }
+chrono = { version = "0.4.37", features = ["alloc"] }
 clap = { version = "4.5.4", features = ["derive", "cargo"] }
 colored = "2.1.0"
 fastrand = "2.0.1"
