@@ -6,12 +6,12 @@
 #![deny(clippy::nursery)]
 #![forbid(clippy::enum_glob_use)]
 #![forbid(clippy::unwrap_used)]
-#![allow(clippy::too_many_lines)]
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_sign_loss)]
-#![allow(clippy::cast_possible_wrap)]
+// #![allow(clippy::too_many_lines)]
+// #![allow(clippy::cognitive_complexity)]
+// #![allow(clippy::cast_precision_loss)]
+// #![allow(clippy::cast_possible_truncation)]
+// #![allow(clippy::cast_sign_loss)]
+// #![allow(clippy::cast_possible_wrap)]
 
 use std::{
     collections::HashMap,
@@ -81,34 +81,34 @@ impl std::ops::Add for StackValue {
 }
 
 impl std::ops::Sub for StackValue {
-    type Output = Self;
+    type Output = anyhow::Result<Self>;
 
-    fn sub(self, other: Self) -> Self {
-        match self {
+    fn sub(self, other: Self) -> Self::Output {
+        Ok(match self {
             Self::String(string) => match other {
                 Self::Integer(int) => {
                     if int < 0 {
-                        return Self::String(string + " ".repeat((-int) as usize).as_str());
+                        Self::String(string + " ".repeat((-int) as usize).as_str())
+                    } else if int as usize > string.len() {
+                        anyhow::bail!("Tried to subtract int from string where the int is bigger than the strings length");
+                    } else {
+                        Self::String(string[..string.len() - int as usize].to_string())
                     }
-                    if int as usize > string.len() {
-                        report_error("Tried to subtract int from string where the int is bigger than the strings length");
-                    }
-                    Self::String(string[..string.len() - int as usize].to_string())
                 }
                 Self::Float(float) => {
                     let int = float.round() as i64;
                     if int < 0 {
-                        return Self::String(string + " ".repeat((-int) as usize).as_str());
+                        Self::String(string + " ".repeat((-int) as usize).as_str())
+                    } else if int as usize > string.len() {
+                        anyhow::bail!("Tried to subtract float from string where the float is bigger than the strings length");
+                    } else {
+                        Self::String(string[..string.len() - int as usize].to_string())
                     }
-                    if int as usize > string.len() {
-                        report_error("Tried to subtract float from string where the float is bigger than the strings length");
-                    }
-                    Self::String(string[..string.len() - int as usize].to_string())
                 }
                 Self::Bool(bool) => {
                     let int = i64::from(bool);
                     if int as usize > string.len() {
-                        report_error("Tried to subtract bool from string where the bool is bigger than the strings length");
+                        anyhow::bail!("Tried to subtract bool from string where the bool is bigger than the strings length");
                     }
                     Self::String(string[..string.len() - int as usize].to_string())
                 }
@@ -132,7 +132,7 @@ impl std::ops::Sub for StackValue {
                 Self::Float(float) => Self::Float(f64::from(boolean) - float),
                 Self::Integer(int) => Self::Integer(i64::from(boolean) - int),
             },
-        }
+        })
     }
 }
 
@@ -176,26 +176,26 @@ impl std::ops::Mul for StackValue {
 }
 
 impl std::ops::Div for StackValue {
-    type Output = Self;
+    type Output = anyhow::Result<either::Either<Self, Vec<Self>>>;
 
-    fn div(self, other: Self) -> Self {
-        match self {
+    fn div(self, other: Self) -> Self::Output {
+        Ok(either::Either::Left(match self {
             Self::String(string) => match other {
                 Self::Integer(int) => Self::String(string) * Self::Float(1.0 / int as f64),
                 Self::Float(float) => Self::String(string) * Self::Float(1.0 / float),
                 Self::Bool(boolean) => Self::String(if boolean { String::new() } else { string }),
-                Self::String(string2) => Self::String(string.split(string2.as_str()).collect::<Vec<_>>().join("/")),
+                Self::String(string2) => return Ok(either::Either::Right(string.split(string2.as_str()).map(str::to_string).map(Self::String).collect::<Vec<_>>())),
             },
             Self::Integer(int) => match other {
                 Self::Integer(int2) => {
                     if int2 == 0 {
-                        report_error("Tried to divide by 0");
+                        anyhow::bail!("Tried to divide by 0");
                     }
                     Self::Float(int as f64 / int2 as f64)
                 }
                 Self::Float(float) => {
                     if float == 0.0 {
-                        report_error("Tried to divide by 0")
+                        anyhow::bail!("Tried to divide by 0")
                     }
                     Self::Float(int as f64 / float)
                 }
@@ -205,45 +205,53 @@ impl std::ops::Div for StackValue {
             Self::Float(float) => match other {
                 Self::Integer(int) => {
                     if int == 0 {
-                        report_error("Tried to divide by 0")
+                        anyhow::bail!("Tried to divide by 0")
                     }
                     Self::Float(float / int as f64)
                 }
                 Self::Float(float2) => {
                     if float2 == 0.0 {
-                        report_error("Tried to divide by 0")
+                        anyhow::bail!("Tried to divide by 0");
                     }
                     Self::Float(float / float2)
                 }
                 Self::String(string) => Self::String(float.to_string() + " / " + string.as_str()),
                 Self::Bool(boolean) => {
                     if !boolean {
-                        report_error("Tried to divide by 0")
+                        anyhow::bail!("Tried to divide by false")
                     }
                     Self::Float(float / f64::from(boolean))
                 }
             },
             Self::Bool(boolean) => match other {
-                Self::Bool(boolean2) => Self::Integer(i64::from(boolean) / i64::from(boolean2)),
+                Self::Bool(boolean2) => {
+                    if !boolean2 {
+                        anyhow::bail!("Tried to divide by false")
+                    }
+                    Self::Integer(i64::from(boolean) / i64::from(boolean2))
+                }
                 Self::String(string) => Self::String(boolean.to_string() + " / " + string.as_str()),
                 Self::Float(float) => {
                     if float == 0.0 {
-                        report_error("Tried to divide by 0")
+                        anyhow::bail!("Tried to divide by 0")
                     }
                     Self::Float(f64::from(boolean) / float)
                 }
                 Self::Integer(int) => {
                     if int == 0 {
-                        report_error("Tried to divide by 0")
+                        anyhow::bail!("Tried to divide by 0")
                     }
                     Self::Float(f64::from(boolean) / int as f64)
                 }
             },
-        }
+        }))
     }
 }
 
 impl StackValue {
+    // I pulled 639.4 out of my ass 👍
+    const EPSILON: f64 = 639.4 * std::f64::EPSILON;
+
     pub fn loose_equal(&self, other: &Self) -> bool {
         match self {
             Self::String(string) => string == &other.to_string(),
@@ -251,17 +259,279 @@ impl StackValue {
                 Self::Integer(int2) => int == int2,
                 Self::Float(float) => int == &(float.round() as i64),
                 Self::Bool(boolean) => *int == i64::from(*boolean),
-                Self::String(_) => other == self,
+                Self::String(_) => other.loose_equal(self),
             },
             Self::Float(float) => match other {
                 Self::Float(float2) => float == float2,
                 Self::Bool(boolean) => *float == f64::from(*boolean),
-                _ => other == self,
+                _ => other.loose_equal(self),
             },
             Self::Bool(boolean) => match other {
                 Self::Bool(boolean2) => boolean == boolean2,
-                _ => other == self,
+                _ => other.loose_equal(self),
             },
+        }
+    }
+
+    pub fn strict_equal(&self, other: &Self) -> bool {
+        match self {
+            Self::String(string) => matches!(other, Self::String(string2) if string == string2),
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => int == int2,
+                Self::Float(float) => ((*int as f64) - float).abs() < Self::EPSILON,
+                Self::Bool(boolean) => int == &i64::from(*boolean),
+                Self::String(_) => other.strict_equal(self), // Free performance
+            },
+            Self::Float(float) => match other {
+                Self::Float(float2) => (float - float2).abs() < Self::EPSILON,
+                Self::Bool(_) => false,
+                _ => other.strict_equal(self),
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => boolean == boolean2,
+                _ => other.strict_equal(self),
+            },
+        }
+    }
+    // strict_strict_equal is just the derived PartialEq
+}
+
+impl std::ops::Shr for StackValue {
+    type Output = anyhow::Result<Self>;
+
+    fn shr(self, other: Self) -> Self::Output {
+        Ok(match self {
+            Self::String(_) => match other {
+                Self::String(string2) => match string2.parse() {
+                    Ok(int) => (self >> Self::Integer(int))?,
+                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
+                },
+                _ => {
+                    (self - other)? // The behavior I intended is basically
+                                    // the same as the subtraction
+                }
+            },
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(if int2 < 0 { int << (-int2) } else { int >> int2 }),
+                Self::Float(float) => Self::Float(int as f64 * 0.5_f64.powf(float)),
+                Self::String(string) => match string.parse::<i64>() {
+                    Ok(int2) => (self >> Self::Integer(int2))?,
+                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
+                },
+                Self::Bool(boolean) => Self::Integer(int >> i64::from(boolean)),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(_) => (Self::Integer(i64::from_le_bytes(float.to_bits().to_le_bytes())) >> other)?,
+                Self::Float(float2) => Self::Float(float * 0.5_f64.powf(float2)),
+                Self::String(string) => match string.parse::<i64>() {
+                    Ok(int) => (self >> Self::Integer(int))?,
+                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
+                },
+                Self::Bool(boolean) => Self::Float(if boolean { float / 2.0 } else { float }),
+            },
+            Self::Bool(boolean) => (Self::Integer(i64::from(boolean)) >> other)?,
+        })
+    }
+}
+
+impl std::ops::Shl for StackValue {
+    type Output = anyhow::Result<Self>;
+
+    fn shl(self, other: Self) -> Self::Output {
+        Ok(match self {
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => (self >> Self::Integer(-int2))?,
+                Self::Float(float) => Self::Float(int as f64 * 2_f64.powf(float)),
+                Self::String(string) => match string.parse::<i64>() {
+                    Ok(int2) => (self << Self::Integer(int2))?,
+                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
+                },
+                Self::Bool(boolean) => Self::Integer(int << i64::from(boolean)),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(_) => (Self::Integer(i64::from_le_bytes(float.to_bits().to_le_bytes())) << other)?,
+                Self::Float(float2) => Self::Float(float * 2.0_f64.powf(float2)),
+                Self::String(string) => match string.parse::<i64>() {
+                    Ok(int) => (self << Self::Integer(int))?,
+                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
+                },
+                Self::Bool(boolean) => Self::Float(if boolean { float * 2.0 } else { float }),
+            },
+            Self::String(ref string) => match other {
+                Self::String(string2) => match string2.parse() {
+                    Ok(int) => (self << Self::Integer(int))?,
+                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
+                },
+                Self::Bool(boolean) => Self::String(if boolean { string.clone() + " " } else { string.clone() }),
+                _ => self + other,
+            },
+            Self::Bool(boolean) => (Self::Integer(i64::from(boolean)) << other)?,
+        })
+    }
+}
+
+impl std::ops::BitOr for StackValue {
+    type Output = Self;
+
+    fn bitor(self, other: Self) -> Self::Output {
+        use itertools::EitherOrBoth as E;
+        match self {
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(int | int2),
+                Self::Float(float) => Self::Integer(int | i64::from_le_bytes(float.to_le_bytes())),
+                Self::String(_) => Self::String(format!("{int:064b}")) | other,
+                Self::Bool(boolean) => Self::Bool((int.abs() > 0) || boolean),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(_) => other | self,
+                Self::Float(float2) => Self::Integer(i64::from_be_bytes(float.to_be_bytes()) | i64::from_ne_bytes(float2.to_ne_bytes())),
+                Self::String(..) => Self::String(format!("{:064b}", i64::from_le_bytes(float.to_le_bytes()))) | other,
+                Self::Bool(boolean) => Self::Bool((float.abs() > 0.0) || boolean),
+            },
+            Self::String(ref string) => match other {
+                Self::String(string2) => Self::String(
+                    string
+                        .chars()
+                        .zip_longest(string2.chars())
+                        .map(|v| match v {
+                            E::Both(a, b) => match a {
+                                ' ' => b,
+                                _ => a,
+                            },
+                            E::Left(a) => a,
+                            E::Right(b) => b,
+                        })
+                        .collect(),
+                ),
+                Self::Bool(boolean) => Self::Bool(!string.is_empty() || boolean),
+                _ => other | self,
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Bool(boolean || boolean2),
+                _ => other | self,
+            },
+        }
+    }
+}
+
+impl std::ops::BitAnd for StackValue {
+    type Output = Self;
+
+    fn bitand(self, other: Self) -> Self::Output {
+        use itertools::EitherOrBoth as E;
+        match self {
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(int & int2),
+                Self::Float(float) => Self::Integer(int & i64::from_le_bytes(float.to_le_bytes())),
+                Self::String(_) => Self::String(format!("{int:064b}")) & other,
+                Self::Bool(boolean) => Self::Bool((int.abs() > 0) && boolean),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(_) => other & self,
+                Self::Float(float2) => Self::Integer(i64::from_be_bytes(float.to_be_bytes()) & i64::from_ne_bytes(float2.to_ne_bytes())),
+                Self::String(_) => Self::String(format!("{:064b}", i64::from_le_bytes(float.to_le_bytes()))) & other,
+                Self::Bool(boolean) => Self::Bool((float.abs() > 0.0) && boolean),
+            },
+            Self::String(ref string) => match other {
+                Self::String(string2) => Self::String(
+                    string
+                        .chars()
+                        .zip_longest(string2.chars())
+                        .map(|v| match v {
+                            E::Both(a, b) => {
+                                if a == b {
+                                    a
+                                } else {
+                                    ' '
+                                }
+                            }
+                            _ => ' ',
+                        })
+                        .collect(),
+                ),
+                Self::Bool(boolean) => Self::Bool(!string.is_empty() && boolean),
+                _ => other & self,
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Bool(boolean && boolean2),
+                _ => other & self,
+            },
+        }
+    }
+}
+
+impl std::ops::BitXor for StackValue {
+    type Output = Self;
+
+    fn bitxor(self, other: Self) -> Self::Output {
+        use itertools::EitherOrBoth as E;
+        match self {
+            Self::Integer(int) => match other {
+                Self::Integer(int2) => Self::Integer(int ^ int2),
+                Self::Float(float) => Self::Integer(int ^ i64::from_le_bytes(float.to_le_bytes())),
+                Self::String(_) => Self::String(format!("{int:064b}")) ^ other,
+                Self::Bool(boolean) => Self::Bool((int.abs() > 0) != boolean),
+            },
+            Self::Float(float) => match other {
+                Self::Integer(_) => other ^ self,
+                Self::Float(float2) => Self::Integer(i64::from_be_bytes(float.to_be_bytes()) ^ i64::from_ne_bytes(float2.to_ne_bytes())),
+                Self::String(_) => Self::String(format!("{:064b}", i64::from_le_bytes(float.to_le_bytes()))) ^ other,
+                Self::Bool(boolean) => Self::Bool((float.abs() > 0.0) != boolean),
+            },
+            Self::String(ref string) => match other {
+                Self::String(string2) => Self::String(
+                    string
+                        .chars()
+                        .zip_longest(string2.chars())
+                        .map(|v| match v {
+                            E::Both(a, b) => {
+                                if a == ' ' {
+                                    b
+                                } else if b == ' ' {
+                                    a
+                                } else {
+                                    ' '
+                                }
+                            }
+                            E::Left(c) | E::Right(c) => c,
+                        })
+                        .collect(),
+                ),
+                Self::Bool(boolean) => Self::Bool(!string.is_empty() != boolean),
+                _ => other & self,
+            },
+            Self::Bool(boolean) => match other {
+                Self::Bool(boolean2) => Self::Bool(boolean != boolean2),
+                _ => other & self,
+            },
+        }
+    }
+}
+
+impl std::ops::Not for StackValue {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Integer(int) => Self::Integer(!int),
+            Self::Float(float) => Self::Integer(!i64::from_be_bytes(float.to_be_bytes())),
+            Self::String(string) => Self::String(
+                string
+                    .chars()
+                    .map(|c| (c.to_ascii_lowercase(), c.is_uppercase()))
+                    .map(|(c, b)| {
+                        (
+                            match c {
+                                'a'..='z' => (((c as u8 - b'a' + 13) % 26) + b'a') as char,
+                                _ => c,
+                            },
+                            b,
+                        )
+                    })
+                    .map(|(c, b)| if b { c.to_ascii_uppercase() } else { c })
+                    .collect(),
+            ),
+            Self::Bool(boolean) => Self::Bool(!boolean),
         }
     }
 }
@@ -348,8 +618,16 @@ pub enum Token {
     Lt,
     /// Greater-than or equal,
     Ge,
+    /// Greater-than or strict equal,
+    Gse,
+    /// Greater-than or stricterer equal,
+    Gsse,
     /// Less-than or equal,
     Le,
+    /// Less-than or strict equal,
+    Lse,
+    /// Less-than or strict strict equal,
+    Lsse,
     /// Shift right,
     Shr,
     /// Shift left,
@@ -427,7 +705,7 @@ pub fn parse_string(mut contents: String) -> anyhow::Result<Vec<Token>> {
             continue;
         }
         if !is_commenting {
-            static_assertions::const_assert_eq!(Token::COUNT, 32);
+            static_assertions::const_assert_eq!(Token::COUNT, 36);
             let token = match word.as_str() {
                 "+" => Token::Add,
                 "-" => Token::Subtract,
@@ -442,7 +720,11 @@ pub fn parse_string(mut contents: String) -> anyhow::Result<Vec<Token>> {
                 ">" => Token::Gt,
                 "<" => Token::Lt,
                 "=>" => Token::Ge,
+                "==>" => Token::Gse,
+                "===>" => Token::Gsse,
                 "<=" => Token::Le,
+                "<==" => Token::Lse,
+                "<===" => Token::Lsse,
                 ">>" => Token::Shr,
                 "<<" => Token::Shl,
                 "or" => Token::Or,
@@ -605,7 +887,7 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
         {
             anyhow::bail!("Exceeded time limit!");
         }
-        static_assertions::const_assert_eq!(Token::COUNT, 32);
+        static_assertions::const_assert_eq!(Token::COUNT, 36);
         // println!("{token:?}, {i}");
         match token {
             Token::Dummy => {}
@@ -623,7 +905,7 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
                 {
-                    stack.push(b - a);
+                    stack.push((b - a)?);
                 } else {
                     anyhow::bail!("The stack must contain at least two elements for a subtraction to be made");
                 }
@@ -641,7 +923,10 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
                 {
-                    stack.push(b / a);
+                    match (b / a)? {
+                        either::Either::Left(sv) => stack.push(sv),
+                        either::Either::Right(svs) => stack.extend(svs),
+                    }
                 } else {
                     anyhow::bail!("The stack must contain at least two elements for a division to be made");
                 }
@@ -652,7 +937,7 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                 {
                     stack.push(StackValue::Bool(a.loose_equal(&b)));
                 } else {
-                    anyhow::bail!("The stack must contain at least two elements fo them to be compared");
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
                 }
             }
             Token::Ineq => {
@@ -664,10 +949,42 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                     anyhow::bail!("The stack must contain at least two elements for them to be compared");
                 }
             }
-            Token::Seq => todo!("Impl strict equal"),
-            Token::Sineq => todo!("Impl strict equal"),
-            Token::Sseq => todo!("Impl strict strict equal"),
-            Token::Ssineq => todo!("Impl strict strict equal"),
+            Token::Seq => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(a.strict_equal(&b)));
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Sineq => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(!a.loose_equal(&b)));
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Sseq => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(a == b))
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Ssineq => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(a != b))
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
             Token::Gt => {
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
@@ -690,7 +1007,7 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
                 {
-                    stack.push(StackValue::Bool(b >= a));
+                    stack.push(StackValue::Bool(b > a || b.loose_equal(&a)));
                 } else {
                     anyhow::bail!("The stack must contain at least two elements for them to be compared");
                 }
@@ -699,17 +1016,99 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
                 {
-                    stack.push(StackValue::Bool(b <= a));
+                    stack.push(StackValue::Bool(b < a || b.loose_equal(&a)));
                 } else {
                     anyhow::bail!("The stack must contain at least two elements for them to be compared");
                 }
             }
-            Token::Shr => todo!("Impl shr"),
-            Token::Shl => todo!("Impl shl"),
-            Token::Or => todo!("Impl or"),
-            Token::And => todo!("Impl and"),
-            Token::Not => todo!("Impl not"),
-            Token::Xor => todo!("Impl xor"),
+            Token::Gse => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b > a || b.strict_equal(&a)));
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Lse => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b < a || b.strict_equal(&a)));
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Gsse => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b > a || b == a));
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Lsse => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(StackValue::Bool(b < a || b == a));
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be compared");
+                }
+            }
+            Token::Shr => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push((b >> a)?);
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be manipulated");
+                }
+            }
+            Token::Shl => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push((b << a)?);
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be manipulated");
+                }
+            }
+            Token::Or => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(b | a);
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be manipulated");
+                }
+            }
+            Token::And => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(b | a);
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be manipulated");
+                }
+            }
+            Token::Not => {
+                if let Some(a) = stack.pop() {
+                    stack.push(!a);
+                } else {
+                    anyhow::bail!("The stack must contain at least one element for it to be negated");
+                }
+            }
+            Token::Xor => {
+                if let Some(a) = stack.pop()
+                    && let Some(b) = stack.pop()
+                {
+                    stack.push(b ^ a);
+                } else {
+                    anyhow::bail!("The stack must contain at least two elements for them to be manipulated");
+                }
+            }
             Token::Dup => {
                 if let Some(a) = stack.last() {
                     stack.push(a.clone());

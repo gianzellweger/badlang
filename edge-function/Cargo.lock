@@ -156,6 +156,7 @@ dependencies = [
  "parser",
  "percent-encoding",
  "serde_json",
+ "tokio",
  "worker",
 ]
 

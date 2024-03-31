@@ -14,6 +14,12 @@ use worker::{event, Env, Request, Response, Result};
 
 #[event(fetch)]
 pub async fn main(req: Request, _env: Env, _ctx: worker::Context) -> Result<Response> {
+    std::thread::sleep(Duration::from_nanos(200));
+    return Response::from_html("<html></html>");
+}
+/*
+#[event(fetch)]
+pub async fn main(req: Request, _env: Env, _ctx: worker::Context) -> Result<Response> {
     let mut path = req.url()?.path().to_string();
     if path == "/" {
         return Ok(Response::from_html(
@@ -86,3 +92,4 @@ pub async fn main(req: Request, _env: Env, _ctx: worker::Context) -> Result<Resp
 
     Ok(Response::from_json(&json)?.with_status(status))
 }
+*/
