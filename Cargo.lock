@@ -390,14 +390,13 @@ dependencies = [
 
 [[package]]
 name = "badlang"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "argon2",
  "captcha",
  "chrono",
  "clap",
  "colored",
- "either",
  "fastrand 2.0.2",
  "geocoding",
  "geolocation",
@@ -1934,12 +1933,8 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "futures-util",
-<<<<<<< HEAD
- "http",
- "indexmap 2.2.6",
-=======
  "http 0.2.12",
- "indexmap 2.2.5",
+ "indexmap 2.2.6",
  "slab",
  "tokio",
  "tokio-util",
@@ -1958,8 +1953,8 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http 1.1.0",
- "indexmap 2.2.5",
-"slab",
+ "indexmap 2.2.6",
+ "slab",
  "tokio",
  "tokio-util",
  "tracing",
@@ -2076,7 +2071,7 @@ checksum = "21b9ddb458710bc376481b842f5da65cdf31522de232c1ca8146abce2a358258"
 dependencies = [
  "bytes",
  "fnv",
- "itoa 1.0.10",
+ "itoa 1.0.11",
 ]
 
 [[package]]
@@ -2177,7 +2172,7 @@ dependencies = [
  "http 1.1.0",
  "http-body 1.0.0",
  "httparse",
- "itoa 1.0.10",
+ "itoa 1.0.11",
  "pin-project-lite",
  "smallvec",
  "tokio",
