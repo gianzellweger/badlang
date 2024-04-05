@@ -34,7 +34,7 @@ itertools = "0.12.1"
 jod-thread = "0.1.2"
 local-ip-address = "0.6.1"
 native-dialog = "0.7.0"
-notify-rust = "4.10.0"
+notify-rust = "4.11.0"
 open = "5.1.2"
 parser = { path = "parser", features = ["silly"] }
 rand = "0.8.5"
