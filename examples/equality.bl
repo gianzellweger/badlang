@@ -1,12 +1,64 @@
-'1' 1    = print    '\n' print
-1.0 1    = print    '\n' print
-1.0 true = print    '\n' print
-1 true   = print    '\n' print
-1 '1'    == print   '\n' print
-1.0 1    == print   '\n' print
-1.0 true == print   '\n' print
-1 true   == print   '\n' print
-1 '1'    === print  '\n' print
-1.0 1    === print  '\n' print
-1.0 true === print  '\n' print
-1 true   === print  '\n' print
+1 1           = println
+1 2           = println
+'1' 1         = println
+'2' 1         = println
+1.0 1         = println
+1.4 1         = println
+1.6 1         = println
+1.0 true      = println
+1.4 true      = println
+0.6 false     = println
+1 true        = println
+1 false       = println
+0.1 0.2 + 0.3 = println
+
+'' println
+
+1 1           == println
+1 2           == println
+'1' 1         == println
+'2' 1         == println
+1.0 1         == println
+1.4 1         == println
+1.6 1         == println
+1.0 true      == println
+1.4 true      == println
+0.6 false     == println
+1 true        == println
+1 false       == println
+0.1 0.2 + 0.3 == println
+
+'' println
+
+1 1           === println
+1 2           === println
+'1' 1         === println
+'2' 1         === println
+1.0 1         === println
+1.4 1         === println
+1.6 1         === println
+1.0 true      === println
+1.4 true      === println
+0.6 false     === println
+1 true        === println
+1 false       === println
+0.1 0.2 + 0.3 === println
+
+'' println
+
+'smol' 'very large' < println
+
+6 9                 < println
+68 68.1             < println
+0 true              < println
+17 'Hello'          < println
+
+68.0 68.1           < println
+68.5 69             < println
+0.5 true            < println
+645.3 'larger'      < println
+
+true false          > println
+true 2              < println
+true 1.1            < println
+false 'true'        < println

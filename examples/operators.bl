@@ -1,0 +1,115 @@
+69 println
+-69 println
+69.0 println
+-69.0 println
+'Hello World' println
+true println
+
+'' println
+
+'2' 2 + println
+'2' 2.0 + println
+'Hello ' 'World' + println
+'Hello ' true + println
+
+2 2 + println
+2 2.5 + println
+2 ' Hello Worlds' + println
+2 true + println
+
+2.5 2 + println
+2.5 2.3 + println
+2.5 ' <== This' + println
+2.0 true + println
+
+true true + println
+true ' true' + println
+true 2.50 + println
+true 2 + println
+
+'\n' print
+
+'Hello World' 6 - println
+'Hello' -1 - 'World' + println
+comment 
+	This errors
+	'Hello' 6 - println
+no_comment
+'HelloWoorld' 5.5 - println
+'HelloWorld' 4.5 - println
+'123456' true - println
+'12345' false - println
+'Helloho Wohorld' 'ho' - println
+
+81 12 - println
+81 12.0 - println
+69 'Hello' - println
+70 true - println
+
+89.0 20 - println
+23.49723 -45.50277 - println
+69.0 'Fortnite' - println
+70.0 true - println
+
+true true - println
+false true - println
+true 'I\'m so done' - println
+true -68.0 - println
+false -69 - println
+
+'' println
+
+'Hello ' 5 * println
+'HelloWorld' 1.5 * println
+'HelloWorld' 0.5 * println
+'Hello World' true * println
+'(This line is supposed to be empty)' print 'Hello World' false * println
+'HloWrd' 'el ol' * println
+'Hllo World' 'e' * println
+
+23 3 * println
+-23 -3 * println
+3 23.0 * println
+-5 'Hello ' * println
+69 true * println
+69 false * println
+
+69.0 1 * println
+207.0 0.3333333333333 * println
+-1.5 'HelloWorld' * println
+69.0 true * println
+
+true true * println
+true false * println
+true 'Hello World' * println
+false 69.0 * println
+true 69 * println
+
+'' println
+
+'HelloWorld' 2 / println
+'Hello ' 0.5 / println
+'Hello World' -1.0 / println
+'(Another empty line, don\'t mind me)' print 'Deleted String' true / println
+'These are words' ' ' / rot println swap println println
+
+276 4 / println
+1 0.01449275362318841 / println
+1 true / println
+1 'Some String' / println
+comment Yes, division by 0 and false fails no_comment
+
+34.5 0.5 / println
+51724.213123 749.626277 / println
+69.0 'Damn this is tiring' / println
+69.0 true / println
+
+true true / println
+false true / println
+true 'Imma write a diary here' / println
+true 0.0144927536 / println
+true 69 / println
+
+comment 
+	See examples/equality.bl for examples using equality and comparison 
+no_comment
