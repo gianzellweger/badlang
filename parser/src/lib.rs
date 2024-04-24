@@ -281,7 +281,7 @@ impl StackValue {
                 Self::Integer(int2) => int == int2,
                 Self::Float(float) => ((*int as f64) - float).abs() < Self::EPSILON,
                 Self::Bool(boolean) => int == &i64::from(*boolean),
-                Self::String(_) => other.strict_equal(self), 
+                Self::String(_) => other.strict_equal(self),
             },
             Self::Float(float) => match other {
                 Self::Float(float2) => (float - float2).abs() < Self::EPSILON,
@@ -358,14 +358,7 @@ impl std::ops::Shl for StackValue {
                 },
                 Self::Bool(boolean) => Self::Float(if boolean { float * 2.0 } else { float }),
             },
-            Self::String(ref string) => match other {
-                Self::String(string2) => match string2.parse() {
-                    Ok(int) => (self << Self::Integer(int))?,
-                    Err(_) => anyhow::bail!("Couldn't parse string as number"),
-                },
-                Self::Bool(boolean) => Self::String(if boolean { string.clone() + " " } else { string.clone() }),
-                _ => self + other,
-            },
+            Self::String(_) => self + other,
             Self::Bool(boolean) => (Self::Integer(i64::from(boolean)) << other)?,
         })
     }
@@ -386,7 +379,7 @@ impl std::ops::BitOr for StackValue {
             Self::Float(float) => match other {
                 Self::Integer(_) => other | self,
                 Self::Float(float2) => Self::Integer(i64::from_be_bytes(float.to_be_bytes()) | i64::from_ne_bytes(float2.to_ne_bytes())),
-                Self::String(..) => Self::String(format!("{:064b}", i64::from_le_bytes(float.to_le_bytes()))) | other,
+                Self::String(_) => Self::String(format!("{:064b}", i64::from_le_bytes(float.to_le_bytes()))) | other,
                 Self::Bool(boolean) => Self::Bool((float.abs() > 0.0) || boolean),
             },
             Self::String(ref string) => match other {
@@ -395,10 +388,7 @@ impl std::ops::BitOr for StackValue {
                         .chars()
                         .zip_longest(string2.chars())
                         .map(|v| match v {
-                            E::Both(a, b) => match a {
-                                ' ' => b,
-                                _ => a,
-                            },
+                            E::Both(a, b) => a.max(b),
                             E::Left(a) => a,
                             E::Right(b) => b,
                         })
