@@ -1082,7 +1082,7 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
                 if let Some(a) = stack.pop()
                     && let Some(b) = stack.pop()
                 {
-                    stack.push(b | a);
+                    stack.push(b & a);
                 } else {
                     anyhow::bail!("The stack must contain at least two elements for them to be manipulated");
                 }
