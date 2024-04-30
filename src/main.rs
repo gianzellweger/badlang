@@ -24,6 +24,8 @@ use savefile::prelude::*;
 extern crate savefile_derive;
 
 mod microservices;
+#[cfg(test)]
+mod test;
 mod tutorial;
 
 use microservices as ms;
@@ -176,53 +178,3 @@ fn main() {
         None => report_error("No subcommand"),
     }
 }
-
-// Because I hate code splitting (not really, it just doesn't fit the feel
-// of the project), tests also go in this file
-/*
-mod tests {
-    #[test]
-    fn test_math() {
-        use crate::Token as T;
-        let tokens = vec![
-            T::Number(10),
-            T::Number(5),
-            T::Add,
-            T::Number(10),
-            T::Number(5),
-            T::Subtract,
-            T::Number(10),
-            T::Number(5),
-            T::Multiply,
-            T::Number(10),
-            T::Number(5),
-            T::Divide,
-        ];
-        let stack = crate::execute_tokens(&tokens, false);
-        assert!(stack.get(0).is_some_and(|v| *v == 15));
-        assert!(stack.get(1).is_some_and(|v| *v == 5));
-        assert!(stack.get(2).is_some_and(|v| *v == 50));
-        assert!(stack.get(3).is_some_and(|v| *v == 2));
-    }
-
-    #[test]
-    fn test_stack_manip() {
-        use crate::Token as T;
-        let tokens = vec![
-            T::Number(1),
-            T::Number(2),
-            T::Number(3), // 1 2 3
-            T::Swap,      // 1 3 2
-            T::Over,      // 1 3 2 3
-            T::Dup,       // 1 3 2 3 3
-            T::Rot,       // 1 3 3 3 2
-        ];
-        let stack = crate::execute_tokens(&tokens, false);
-        assert!(stack.get(0).is_some_and(|v| *v == 1));
-        assert!(stack.get(1).is_some_and(|v| *v == 3));
-        assert!(stack.get(2).is_some_and(|v| *v == 3));
-        assert!(stack.get(3).is_some_and(|v| *v == 3));
-        assert!(stack.get(4).is_some_and(|v| *v == 2));
-    }
-}
-*/

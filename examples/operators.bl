@@ -194,7 +194,7 @@ false false and println
 
 420.0 420.00000000000392219590139575302600860595703125 xor println
 0.0 '                                                                 69' xor println
-0.0 true println
+0.0 true xor println
 
 'F r n t' ' o t i e' xor println
 'Hello' 'World!' xor println
@@ -209,3 +209,4 @@ false false xor println
 'Sbegavgr' not println
 false not println
 true not println
+

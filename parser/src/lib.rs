@@ -664,7 +664,7 @@ pub fn parse_string(mut contents: String) -> anyhow::Result<Vec<Token>> {
 
     let mut chars = contents.chars();
     while let Some(chr) = chars.next() {
-        if chr == '\'' {
+        if chr == '\'' && !is_commenting {
             if is_stringing {
                 tokens.push(Token::StackValue(StackValue::String(word)));
                 word = String::new();
@@ -1151,8 +1151,8 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
             }
             Token::Print => {
                 if let Some(a) = stack.pop() {
-                    if write!(writable, "{a}").is_err() {
-                        anyhow::bail!("Couldn't write to writable");
+                    if let Err(err) = write!(writable, "{a}") {
+                        anyhow::bail!("Couldn't write to writable because {err}");
                     };
                 } else {
                     anyhow::bail!("The stack must contain at least one element for it to be printed");
@@ -1160,8 +1160,8 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
             }
             Token::Println => {
                 if let Some(a) = stack.pop() {
-                    if writeln!(writable, "{a}").is_err() {
-                        anyhow::bail!("Couldn't write to writable");
+                    if let Err(err) = writeln!(writable, "{a}") {
+                        anyhow::bail!("Couldn't write to writable because {err}");
                     }
                 } else {
                     anyhow::bail!("The stack must contain at least one element for it to be printed");
@@ -1184,6 +1184,6 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
         }
         i += 1;
     }
-    println!();
+    eprintln!();
     Ok(stack)
 }
