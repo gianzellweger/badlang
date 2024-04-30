@@ -11,11 +11,7 @@ fn operators() {
     let mut buf = vec![];
     let stack = pa::execute_tokens(&tokens, false, &mut buf, None).unwrap();
     assert!(stack.is_empty(), "{stack:#?}");
-    let operators = if cfg!(windows) {
-        OPERATORS.replace("\r\n", "\n")
-    } else {
-        OPERATORS
-    }
+    let operators = if cfg!(windows) { OPERATORS.replace("\r\n", "\n") } else { OPERATORS.to_string() };
     assert_eq!(operators, String::from_utf8(buf.to_vec()).unwrap().as_str());
 }
 
@@ -25,10 +21,6 @@ fn equality() {
     let mut buf = vec![];
     let stack = pa::execute_tokens(&tokens, false, &mut buf, None).unwrap();
     assert!(stack.is_empty(), "{stack:#?}");
-    let equality = if cfg!(windows) {
-        EQUALITY.replace("\r\n", "\n")
-    } else {
-        EQUALITY
-    }
+    let equality = if cfg!(windows) { EQUALITY.replace("\r\n", "\n") } else { EQUALITY.to_string() };
     assert_eq!(equality, String::from_utf8(buf.to_vec()).unwrap().as_str());
 }
