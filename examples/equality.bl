@@ -58,7 +58,9 @@
 0.5 true            < println
 645.3 'larger'      < println
 
-true false          > println
+false true          < println
 true 2              < println
 true 1.1            < println
 false 'true'        < println
+
+

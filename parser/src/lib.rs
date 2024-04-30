@@ -489,11 +489,11 @@ impl std::ops::BitXor for StackValue {
                         .collect(),
                 ),
                 Self::Bool(boolean) => Self::Bool(!string.is_empty() != boolean),
-                _ => other & self,
+                _ => other ^ self,
             },
             Self::Bool(boolean) => match other {
                 Self::Bool(boolean2) => Self::Bool(boolean != boolean2),
-                _ => other & self,
+                _ => other ^ self,
             },
         }
     }
