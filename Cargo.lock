@@ -386,6 +386,8 @@ dependencies = [
  "notify-rust",
  "open",
  "parser",
+ "percent-encoding",
+ "qrcode 0.14.0",
  "rand 0.8.5",
  "reqwest 0.12.4",
  "savefile",
@@ -1830,7 +1832,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "percent-encoding",
- "qrcode",
+ "qrcode 0.12.0",
  "rand 0.8.5",
  "vc-ltl",
 ]
@@ -2286,6 +2288,17 @@ dependencies = [
  "color_quant",
  "num-traits",
  "png",
+]
+
+[[package]]
+name = "image"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd54d660e773627692c524beaad361aca785a4f9f5730ce91f42aabe5bce3d11"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "num-traits",
 ]
 
 [[package]]
@@ -3551,6 +3564,15 @@ checksum = "16d2f1455f3630c6e5107b4f2b94e74d76dea80736de0981fd27644216cff57f"
 dependencies = [
  "checked_int_cast",
  "image 0.23.14",
+]
+
+[[package]]
+name = "qrcode"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23e719ca51966ff9f5a8436edb00d6115b3c606a0bb27c8f8ca74a38ff2b036d"
+dependencies = [
+ "image 0.25.1",
 ]
 
 [[package]]

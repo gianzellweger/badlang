@@ -279,8 +279,6 @@ pub fn password_validator(password: &str) -> Result<Validation, CustomUserError>
         Validation::Invalid("Your password must contain an emoji".into())
     } else if password.chars().collect::<HashSet<_>>().len() < password.chars().count() {
         Validation::Invalid("Your password may not contain duplicate characters".into())
-    } else if password.contains("123") || password.contains("69") || password.contains("420") || password.to_lowercase().contains("password") {
-        Validation::Invalid("Your password may not contain any well known sequences".into())
     } else if let Some(wordle_answer) = todays_wordle_answer.as_ref()
         && !password.to_lowercase().contains(wordle_answer.to_lowercase().as_str())
         && wordle_answer.chars().collect::<HashSet<_>>().len() == wordle_answer.len()
@@ -291,7 +289,7 @@ pub fn password_validator(password: &str) -> Result<Validation, CustomUserError>
         && let Some(wordle_answer) = todays_wordle_answer
         && !passwords.contains(&wordle_answer)
     {
-        Validation::Invalid(format!("Your password contains one of the top 100 most common passwords, '{part}', making it insecure").into())
+        Validation::Invalid(format!("Your password contains one of the top 10000 most common passwords, '{part}', making it insecure").into())
     } else {
         Validation::Valid
     })
@@ -427,11 +425,24 @@ pub fn login(account: &mut Option<Account>) {
 
             let ga = google_authenticator::GoogleAuthenticator::new();
             let secret = ga.create_secret(32);
-            let mut qr_code_url = ga.qr_code_url(secret.as_str(), name.as_str(), "Badlang™", 500, 500, google_authenticator::ErrorCorrectionLevel::High);
-            qr_code_url = qr_code_url.replace('|', "%7C");
-            let _ = open::that(qr_code_url);
+            let scheme = format!(
+                "otpauth://totp/{}?secret={}&issuer={}",
+                percent_encoding::utf8_percent_encode(name.as_str(), percent_encoding::NON_ALPHANUMERIC),
+                secret,
+                percent_encoding::utf8_percent_encode("BadLang™", percent_encoding::NON_ALPHANUMERIC)
+            );
+            let qr_code = qrcode::QrCode::new(scheme.as_bytes()).expect("Wow why no QR-code?");
 
-            print!("A QR-code with your Google Authenticator code just opened in your browser. Do scan it, because it will never ever be available again! Press enter as soon as you're ready ");
+            println!("{}", qr_code.render().light_color("  ").dark_color("██").build());
+
+            print!(
+                "{}",
+                "This is a 2FA code that secures your account. It is scannable using apps such as Google Authenticator. Do scan it, because it will never ever be available again! Press enter as \
+                 soon as you're ready "
+                    .bright_green()
+                    .bold()
+            );
+
             let _ = std::io::stdout().flush();
             {
                 let mut buffer = String::new();

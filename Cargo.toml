@@ -37,6 +37,8 @@ native-dialog = "0.7.0"
 notify-rust = "4.11.0"
 open = "5.1.2"
 parser = { path = "parser", features = ["silly"] }
+percent-encoding = "2.3.1"
+qrcode = "0.14.0"
 rand = "0.8.5"
 reqwest = { version = "0.12.4", features = ["json", "blocking"] }
 savefile = "0.17.1"
