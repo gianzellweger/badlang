@@ -3908,9 +3908,9 @@ dependencies = [
 
 [[package]]
 name = "savefile"
-version = "0.16.5"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b0066dc64379049384fd7b26358f92316e95c95a079af5c8cd02b1a1b62efd4"
+checksum = "3c619b0332172b4a7b048721add9b503828548494ba067d902d7682de1499e4b"
 dependencies = [
  "arrayvec",
  "bit-set",
