@@ -39,8 +39,8 @@ open = "5.1.2"
 parser = { path = "parser", features = ["silly"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.4", features = ["json", "blocking"] }
-savefile = "0.16.5"
-savefile-derive = "0.16.5"
+savefile = "0.17.1"
+savefile-derive = "0.17.1"
 semver = "1.0.22"
 serde_json = "1.0.116"
 static_assertions = "1.1.0"
