@@ -7,13 +7,13 @@ edition = "2021"
 silly = ["dep:geocoding", "dep:geolocation", "dep:local-ip-address"]
 
 [dependencies]
-anyhow = "1.0.81"
+anyhow = "1.0.83"
 colored = "2.1.0"
-either = "1.10.0"
+either = "1.11.0"
 geocoding = { version = "0.4.0", optional = true }
 geolocation = { version = "0.2.1", optional = true }
 itertools = "0.12.1"
 local-ip-address = { version = "0.6.1", optional = true }
 static_assertions = "1.1.0"
-strum = "0.26.1"
-strum_macros = "0.26.1"
+strum = "0.26.2"
+strum_macros = "0.26.2"

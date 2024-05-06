@@ -1,40 +1,40 @@
 true if
-	'Working!\n' print
+	'Working!' println
 fi
 
 
 false if
-	'Not working!\n' print
+	'Not working!' println
 else
-	'Working!\n' print
+	'Working!' println
 fi
 
 
 false if
-	'Not working!\n' print
+	'Not working!' println
 MrBeast! true elif
-	'Working!\n' print
+	'Working!' println
 fi
 
 
 false if
-	'Not working!\n' print
+	'Not working!' println
 MrBeast! false elif
-	'Not working!\n' print
+	'Not working!' println
 else
-	'Working!\n' print
+	'Working!' println
 fi
 
 
 false if
 	false if
-		'Not working!\n' print
+		'Not working!' println
 	else
-		'Not working!\n' print
+		'Not working!' println
 	fi
-	'Not working!\n' print
+	'Not working!' println
 MrBeast! false elif
-	'Not working!\n' print
+	'Not working!' println
 else
-	'Working!\n' print
+	'Working!' println
 fi
