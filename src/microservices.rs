@@ -473,7 +473,7 @@ pub fn login(account: &mut Option<Account>) {
         }
         FIRST_OPTION => {
             let Some(account) = account.as_ref() else {
-                report_error("You do in fact not have an account");
+                report_error("You don't have an account yet!");
             };
 
             let name = inquire::Text::new("Enter your username: ")
