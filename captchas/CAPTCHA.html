@@ -1,0 +1,16 @@
+<html>
+  <head>
+    <title>reCAPTCHA demo: Simple page</title>
+    <script src="https://www.google.com/recaptcha/enterprise.js" async defer></script>
+  </head>
+  <body>
+    <div class="g-recaptcha" data-sitekey="6LdtVXgpAAAAAN__TrlyP7N-yQujEKdeGckA_O4q" data-action="LOGIN"></div>
+    <script>
+      setInterval(_ => { 
+        if (grecaptcha.enterprise.getResponse() != "") {
+          console.log("Success");
+        }
+      }, 200);
+    </script>
+  </body>
+</html>
