@@ -16,8 +16,8 @@
 
 use std::path::PathBuf;
 
+use badlang_parser as pa;
 pub use pa::{report_error, report_warning};
-use parser as pa;
 use savefile::prelude::*;
 
 #[macro_use]
