@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use parser as pa;
+use badlang_parser as pa;
 
 const OPERATORS: &str = include_str!("../tests/operators.out");
 const EQUALITY: &str = include_str!("../tests/equality.out");
