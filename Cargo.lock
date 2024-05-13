@@ -3953,9 +3953,9 @@ dependencies = [
 
 [[package]]
 name = "savefile-derive"
-version = "0.17.3"
+version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78134e82d1e4dc7f1cb7481fde6cefc3ab99fcf44edf4dcef104488fb293e840"
+checksum = "cb342f6d7d45b6418fe64a1b8c98275d528f437950f637df49a9ff031816ffa1"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
