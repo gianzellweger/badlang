@@ -124,32 +124,32 @@ fn main() {
         report_error("I can't currently open a subscription page without doing some tax-evasion in-case somebody actually donates. Maybe later :/");
     }
 
+    let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
+    savefile_path.push(".config");
+    savefile_path.push("badlang");
+    savefile_path.push("badlang.bin");
+
+    let mut save_data = match load_file::<ms::SaveData, &PathBuf>(&savefile_path, 0) {
+        Ok(sd) => {
+            if sd
+                .account
+                .as_ref()
+                .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
+            {
+                sd
+            } else {
+                report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
+                ms::SaveData::default()
+            }
+        }
+        Err(_) => ms::SaveData::default(),
+    };
+
     match matches.subcommand() {
         Some(("run", run_matches)) => {
             let out_of_free_runs = if let Some(no_troll) = run_matches.get_one::<bool>("notroll")
                 && !(*no_troll)
             {
-                let mut savefile_path = home::home_dir().expect("Couldn't locate your home directory, aborting");
-                savefile_path.push(".config");
-                savefile_path.push("badlang");
-                savefile_path.push("badlang.bin");
-
-                let mut save_data = match load_file::<ms::SaveData, &PathBuf>(&savefile_path, 0) {
-                    Ok(sd) => {
-                        if sd
-                            .account
-                            .as_ref()
-                            .is_some_and(|acc| acc.version == semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string())
-                        {
-                            sd
-                        } else {
-                            report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
-                            ms::SaveData::default()
-                        }
-                    }
-                    Err(_) => ms::SaveData::default(),
-                };
-
                 sillyness(&mut save_data);
 
                 if let Some(parent_dir) = savefile_path.parent() {
@@ -173,7 +173,7 @@ fn main() {
             pa::execute_tokens(&tokens, out_of_free_runs, &mut std::io::stdout(), None).unwrap_or_else(|err| report_error(err.to_string().as_str()));
         }
 
-        Some(("tutorial", _)) => tutorial::tutorial(0),
+        Some(("tutorial", _)) => tutorial::tutorial(&mut save_data.tutorial_level).expect("TODO"),
         Some((_, _)) => report_error("Invalid subcommand!"),
         None => report_error("No subcommand"),
     }

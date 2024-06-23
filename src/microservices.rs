@@ -115,6 +115,7 @@ pub struct SaveData {
     pub runs_so_far:       usize,
     pub last_update:       u64,  // This is in seconds since UNIX_EPOCH
     pub dialogs_displayed: bool, // It makes sense to display them only once per device, as this is how it works in serious applications.
+    pub tutorial_level:    u8,
 }
 
 // These files are used to measure download speed. There are multiple
