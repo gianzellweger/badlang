@@ -3762,9 +3762,9 @@ dependencies = [
 
 [[package]]
 name = "ratatui"
-version = "0.27.0-alpha.8"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5e5fabe671ff0a87925e9f57ffc550ef2d6c57d60279b1c062dcd20143999a6"
+checksum = "d16546c5b5962abf8ce6e2881e722b4e0ae3b6f1a08a26ae3573c55853ca68d3"
 dependencies = [
  "bitflags 2.5.0",
  "cassowary",
