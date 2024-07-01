@@ -2437,6 +2437,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "instability"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b23a0c8dfe501baac4adf6ebbfa6eddf8f0c07f56b058cc1288017e32397846c"
+dependencies = [
+ "quote",
+ "syn 2.0.67",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3762,18 +3772,18 @@ dependencies = [
 
 [[package]]
 name = "ratatui"
-version = "0.27.0-alpha.8"
+version = "0.27.1-alpha.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5e5fabe671ff0a87925e9f57ffc550ef2d6c57d60279b1c062dcd20143999a6"
+checksum = "49cc1f2fab57e54e6b8a91cb0c4a34a7d02020ad4272faa71c3038cc2c896dec"
 dependencies = [
  "bitflags 2.5.0",
  "cassowary",
  "compact_str",
  "crossterm 0.27.0",
+ "instability",
  "itertools 0.13.0",
  "lru",
  "paste",
- "stability",
  "strum",
  "strum_macros",
  "unicode-segmentation",
@@ -4476,16 +4486,6 @@ name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-
-[[package]]
-name = "stability"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ff9eaf853dec4c8802325d8b6d3dffa86cc707fd7a1a4cdbf416e13b061787a"
-dependencies = [
- "quote",
- "syn 2.0.67",
-]
 
 [[package]]
 name = "stable_deref_trait"
