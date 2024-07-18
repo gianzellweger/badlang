@@ -95,9 +95,10 @@ fn sillyness(save_data: &mut ms::SaveData) {
 
 fn main() {
     // Using this removes lots of fluff from panic messages
-    std::panic::set_hook(Box::new(|panic_bundle| {
-        eprintln!("{}", panic_bundle.payload().downcast_ref::<String>().map_or_else(|| panic_bundle.to_string(), std::clone::Clone::clone));
-    }));
+    // std::panic::set_hook(Box::new(|panic_bundle| {
+    //     eprintln!("{}",
+    // panic_bundle.payload().downcast_ref::<String>().map_or_else(||
+    // panic_bundle.to_string(), std::clone::Clone::clone)); }));
 
     let matches = clap::command!()
         .subcommands([
@@ -139,11 +140,23 @@ fn main() {
                 sd
             } else {
                 report_warning("Because the version your account was created on doesn't match your current version, your account was invalidated. Create a new one.");
-                ms::SaveData::default()
+                ms::SaveData {
+                    runs_so_far: sd.runs_so_far,
+                    last_update: sd.last_update,
+                    dialogs_displayed: sd.dialogs_displayed,
+                    tutorial_state: sd.tutorial_state,
+                    ..Default::default()
+                }
             }
         }
         Err(_) => ms::SaveData::default(),
     };
+
+    if let Some(parent_dir) = savefile_path.parent() {
+        if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
+            report_error(format!("Couldn't create savefile because {err}").as_str());
+        }
+    }
 
     match matches.subcommand() {
         Some(("run", run_matches)) => {
@@ -151,12 +164,6 @@ fn main() {
                 && !(*no_troll)
             {
                 sillyness(&mut save_data);
-
-                if let Some(parent_dir) = savefile_path.parent() {
-                    if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
-                        report_error(format!("Couldn't create savefile because {err}").as_str());
-                    }
-                }
 
                 save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
 
@@ -173,7 +180,10 @@ fn main() {
             pa::execute_tokens(&tokens, out_of_free_runs, &mut std::io::stdout(), None).unwrap_or_else(|err| report_error(err.to_string().as_str()));
         }
 
-        Some(("tutorial", _)) => tutorial::tutorial(&mut save_data.tutorial_level).expect("TODO"),
+        Some(("tutorial", _)) => {
+            tutorial::tutorial(&mut save_data.tutorial_state).expect("TODO");
+            save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
+        }
         Some((_, _)) => report_error("Invalid subcommand!"),
         None => report_error("No subcommand"),
     }

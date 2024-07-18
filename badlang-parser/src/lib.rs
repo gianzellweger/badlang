@@ -23,6 +23,7 @@ use colored::Colorize;
 #[cfg(feature = "silly")]
 use geocoding::Reverse;
 use itertools::Itertools;
+use savefile_derive::Savefile;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
 
@@ -33,7 +34,8 @@ pub fn report_error(string: &str) -> ! {
 pub fn report_warning(string: &str) {
     eprintln!("{}: {string}", "WARNING".bold().yellow());
 }
-#[derive(Clone, Debug, PartialEq)]
+
+#[derive(Clone, Debug, PartialEq, Savefile)]
 pub enum StackValue {
     Integer(i64),
     Float(f64),
@@ -553,7 +555,7 @@ impl std::cmp::PartialOrd for StackValue {
     }
 }
 
-#[derive(EnumCountMacro, Clone, PartialEq, Debug)]
+#[derive(EnumCountMacro, Clone, PartialEq, Debug, Savefile)]
 pub enum Token {
     /// Just a fucking n̶u̶m̶b̶e̶r̶ value✨
     StackValue(StackValue),
@@ -635,6 +637,53 @@ pub enum Token {
     Xor,
     /// Does absolutely nothing, much like this programming language.
     Dummy,
+}
+
+impl Token {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Token::StackValue(StackValue::Integer(_)) => "integer literals",
+            Token::StackValue(StackValue::String(_)) => "string literals",
+            Token::StackValue(StackValue::Float(_)) => "float literals",
+            Token::StackValue(StackValue::Bool(_)) => "boolean literals",
+            Token::Add => "addition (+)",
+            Token::Subtract => "subtraction (-)",
+            Token::Multiply => "multiplication (*)",
+            Token::Divide => "division (/)",
+            Token::Dup => "the `dup` keyword",
+            Token::Drop => "the `drop` keyword",
+            Token::Swap => "the `swap` keyword",
+            Token::Over => "the `over` keyword",
+            Token::Rot => "the `rot` keyword",
+            Token::Print => "the `print` function",
+            Token::Println => "the `println` function",
+            Token::If(_) => "the `if` and `fi` keywords",
+            Token::Elif(_) => "the `elif` keyword",
+            Token::Else(_) => "the `else` keyword",
+            Token::MrBeast(_) => "the `MrBeast!` keyword",
+            Token::Eq => "simple equals (=)",
+            Token::Seq => "strict equals (==)",
+            Token::Sseq => "stricter equals (===)",
+            Token::Ineq => "simple unequals (!=)",
+            Token::Sineq => "strict unequals (!==)",
+            Token::Ssineq => "stricter unequals (!===)",
+            Token::Gt => "greater than (>)",
+            Token::Lt => "less than (<)",
+            Token::Ge => "greater than or equal (=>)",
+            Token::Gse => "greater than or strict equal (==>)",
+            Token::Gsse => "greater than or stricter equal (===>)",
+            Token::Le => "less than or equal (<=)",
+            Token::Lse => "less than or strict equal (<==)",
+            Token::Lsse => "less than or stricter equal (<===)",
+            Token::Shr => "shift right (>>)",
+            Token::Shl => "shift left (<<)",
+            Token::Or => "the `or` keyword",
+            Token::And => "the `and` keyword",
+            Token::Not => "the `not` keyword",
+            Token::Xor => "the `xor` keyword",
+            Token::Dummy => "unreachable",
+        }
+    }
 }
 
 pub fn parse_file(path: &PathBuf) -> anyhow::Result<Vec<Token>> {
@@ -1184,6 +1233,5 @@ pub fn execute_tokens<T: std::io::Write>(tokens: &[Token], #[cfg(feature = "sill
         }
         i += 1;
     }
-    eprintln!();
     Ok(stack)
 }

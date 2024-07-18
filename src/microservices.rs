@@ -14,6 +14,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use badlang_parser as pa;
 use colored::Colorize;
 use inquire::{validator::Validation, CustomUserError};
 use rand::distributions::Distribution;
@@ -100,6 +101,27 @@ pub fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
     let _ = window.set_focus();
 }
 
+#[derive(Debug, Savefile, Clone)]
+pub struct EditorState {
+    pub text:              Vec<String>,
+    pub cursor:            (u16, u16),
+    pub console:           Result<String, String>,
+    pub level:             u8,
+    pub unlocked_features: Vec<pa::Token>,
+}
+
+impl std::default::Default for EditorState {
+    fn default() -> Self {
+        Self {
+            text:              vec![],
+            cursor:            (0, 0),
+            console:           Ok(String::new()),
+            level:             0,
+            unlocked_features: vec![pa::Token::StackValue(pa::StackValue::Integer(0)), pa::Token::Print, pa::Token::Println],
+        }
+    }
+}
+
 #[derive(Savefile, Clone, Debug)]
 pub struct Account {
     pub name:               String,
@@ -115,7 +137,7 @@ pub struct SaveData {
     pub runs_so_far:       usize,
     pub last_update:       u64,  // This is in seconds since UNIX_EPOCH
     pub dialogs_displayed: bool, // It makes sense to display them only once per device, as this is how it works in serious applications.
-    pub tutorial_level:    u8,
+    pub tutorial_state:    EditorState,
 }
 
 // These files are used to measure download speed. There are multiple
