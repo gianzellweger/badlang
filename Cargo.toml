@@ -51,6 +51,6 @@ static_assertions = "1.1.0"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 tauri = { version = "1.6.8", features = ["window-all", "process-command-api"] }
-tokio = "1.38.0"
+tokio = "1.39.1"
 unic-emoji-char = "0.9.0"
 crokey = "1.0.1"
