@@ -42,7 +42,7 @@ badlang-parser = { path = "badlang-parser", features = ["silly"], version = "0.1
 percent-encoding = "2.3.1"
 qrcode = "0.14.0"
 rand = "0.8.5"
-reqwest = { version = "0.12.5", features = ["json", "blocking"] }
+reqwest = { version = "0.12.7", features = ["json", "blocking"] }
 savefile = "0.17.4"
 savefile-derive = "0.17.7"
 semver = "1.0.23"
