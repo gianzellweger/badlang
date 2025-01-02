@@ -18,7 +18,7 @@ tauri-build = { version = "1.5.2", features = [] }
 
 [dependencies]
 ratatui = "0.27.0"
-anyhow = "1.0.86"
+anyhow = "1.0.95"
 argon2 = "0.5.3"
 captcha = "0.0.9"
 chrono = { version = "0.4.38", features = ["alloc"] }
