@@ -17,7 +17,7 @@ edition = "2021"
 tauri-build = { version = "2.0.3", features = [] }
 
 [dependencies]
-ratatui = "0.27.0"
+ratatui = "0.29.0"
 anyhow = "1.0.95"
 argon2 = "0.5.3"
 captcha = "0.0.9"
