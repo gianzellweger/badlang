@@ -54,3 +54,4 @@ tauri = { version = "1.6.8", features = ["window-all", "process-command-api"] }
 tokio = "1.39.3"
 unic-emoji-char = "0.9.0"
 crokey = "1.0.1"
+robius-authentication = "0.1.1"
