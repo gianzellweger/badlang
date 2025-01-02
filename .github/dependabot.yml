@@ -5,3 +5,5 @@ updates:
     target-branch: "dev"
     schedule:
       interval: "daily"
+      time: "23:05"
+      timezone: "Europe/Zurich"
