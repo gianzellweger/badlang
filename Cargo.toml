@@ -22,7 +22,7 @@ anyhow = "1.0.95"
 argon2 = "0.5.3"
 captcha = "0.0.9"
 chrono = { version = "0.4.39", features = ["alloc"] }
-clap = { version = "4.5.24", features = ["derive", "cargo"] }
+clap = { version = "4.5.28", features = ["derive", "cargo"] }
 colored = "3.0.0"
 fastrand = "2.3.0"
 geocoding = "0.4.0"
