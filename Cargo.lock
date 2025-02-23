@@ -409,7 +409,7 @@ dependencies = [
  "ratatui",
  "reqwest 0.12.12",
  "robius-authentication",
- "savefile 0.18.2",
+ "savefile 0.18.5",
  "savefile-derive 0.18.5",
  "semver 1.0.25",
  "serde_json",
@@ -4629,9 +4629,9 @@ dependencies = [
 
 [[package]]
 name = "savefile"
-version = "0.18.2"
+version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69d5c0f5703af632fe30456c533d01711e472e5bb02821ce85ae8ef880f087ac"
+checksum = "c9f7b44316ef847a45b8346864c1ccc065e694bd3c041ff60953f5e0a3221acb"
 dependencies = [
  "arrayvec",
  "bit-set 0.5.3",
@@ -4639,7 +4639,7 @@ dependencies = [
  "bit-vec 0.6.3",
  "bit-vec 0.8.0",
  "byteorder",
- "indexmap 1.9.3",
+ "indexmap 2.7.1",
  "memoffset",
  "parking_lot",
  "rustc_version 0.4.0",
