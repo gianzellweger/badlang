@@ -20,7 +20,7 @@ tauri-build = { version = "2.2.0", features = [] }
 ratatui = "0.29.0"
 anyhow = "1.0.95"
 argon2 = "0.5.3"
-captcha = "0.0.9"
+captcha = "1.0.0"
 chrono = { version = "0.4.42", features = ["alloc"] }
 clap = { version = "4.5.30", features = ["derive", "cargo"] }
 colored = "3.0.0"
