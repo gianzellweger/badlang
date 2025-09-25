@@ -403,7 +403,7 @@ dependencies = [
  "ratatui",
  "reqwest 0.12.12",
  "robius-authentication",
- "savefile 0.18.5",
+ "savefile 0.20.1",
  "savefile-derive 0.20.1",
  "semver 1.0.27",
  "serde_json",
@@ -1292,7 +1292,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -2192,7 +2192,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http 0.2.12",
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "slab",
  "tokio",
  "tokio-util",
@@ -2211,7 +2211,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http 1.1.0",
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "slab",
  "tokio",
  "tokio-util",
@@ -2634,13 +2634,14 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.7.1"
+version = "2.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
+checksum = "4b0f83760fb341a774ed326568e19f5a863af4a952def8c39f9ab92fd95b88e5"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.2",
  "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -3862,7 +3863,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42cf17e9a1800f5f396bc67d193dc9411b59012a5876445ef450d449881e1016"
 dependencies = [
  "base64 0.22.1",
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "quick-xml 0.32.0",
  "serde",
  "time",
@@ -4598,9 +4599,9 @@ dependencies = [
 
 [[package]]
 name = "savefile"
-version = "0.18.5"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9f7b44316ef847a45b8346864c1ccc065e694bd3c041ff60953f5e0a3221acb"
+checksum = "d5d5a8c5f38fe9cdec2fb29d0d45f614eda2608bb1536f037ef31336f1ec6323"
 dependencies = [
  "arrayvec",
  "bit-set 0.5.3",
@@ -4608,10 +4609,12 @@ dependencies = [
  "bit-vec 0.6.3",
  "bit-vec 0.8.0",
  "byteorder",
- "indexmap 2.7.1",
+ "chrono",
+ "indexmap 2.11.4",
  "memoffset",
  "parking_lot",
  "rustc_version 0.4.0",
+ "savefile-derive 0.20.1",
  "smallvec",
 ]
 
@@ -4813,7 +4816,7 @@ version = "1.0.145"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "itoa 1.0.11",
  "memchr",
  "ryu",
@@ -4872,7 +4875,7 @@ dependencies = [
  "chrono",
  "hex",
  "indexmap 1.9.3",
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "serde",
  "serde_derive",
  "serde_json",
@@ -5805,7 +5808,7 @@ version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae2a4cf385da23d1d53bc15cdfa5c2109e93d8d362393c801e87da2f72f0e201"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "serde_core",
  "serde_spanned 1.0.1",
  "toml_datetime 0.7.1",
@@ -5838,7 +5841,7 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "toml_datetime 0.6.9",
  "winnow 0.5.40",
 ]
@@ -5849,7 +5852,7 @@ version = "0.22.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.11.4",
  "serde",
  "serde_spanned 0.6.8",
  "toml_datetime 0.6.9",
@@ -6793,7 +6796,7 @@ version = "0.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e201184e40b2ede64bc2ea34968b28e33622acdbbf37104f0e4a33f7abe657aa"
 dependencies = [
- "windows-link",
+ "windows-link 0.2.0",
 ]
 
 [[package]]
