@@ -379,8 +379,8 @@ dependencies = [
  "ratatui",
  "reqwest 0.12.24",
  "robius-authentication",
- "savefile 0.20.1",
- "savefile-derive 0.20.1",
+ "savefile 0.20.2",
+ "savefile-derive 0.20.2",
  "semver 1.0.27",
  "serde_json",
  "static_assertions",
@@ -4643,9 +4643,9 @@ dependencies = [
 
 [[package]]
 name = "savefile"
-version = "0.20.1"
+version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5d5a8c5f38fe9cdec2fb29d0d45f614eda2608bb1536f037ef31336f1ec6323"
+checksum = "6c9d972a1205fa8f3bc44e27f51f65d9230d6917be790c7e730c7cb31f90f3c4"
 dependencies = [
  "arrayvec",
  "bit-set 0.5.3",
@@ -4658,7 +4658,7 @@ dependencies = [
  "memoffset",
  "parking_lot",
  "rustc_version 0.4.0",
- "savefile-derive 0.20.1",
+ "savefile-derive 0.20.2",
  "smallvec",
 ]
 
@@ -4676,9 +4676,9 @@ dependencies = [
 
 [[package]]
 name = "savefile-derive"
-version = "0.20.1"
+version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f6934119e6ae3f1838cbb28dfcec2089835dd51edfdb53e3bb80540b926b803"
+checksum = "e29d6e597871837cd8196ddf01ef699312ed58a63be361bf40d77b2b6d1d8cfd"
 dependencies = [
  "proc-macro-error2",
  "proc-macro2",
