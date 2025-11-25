@@ -1,0 +1,23 @@
+   Compiling badlang v0.4.0 (/Users/gian/badlang)
+warning: unused variable: `fmt`
+   --> src/tutorial.rs:201:9
+    |
+201 |     let fmt = KeyCombinationFormat::default();
+    |         ^^^ help: if this is intentional, prefix it with an underscore: `_fmt`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `combines`
+   --> src/tutorial.rs:203:9
+    |
+203 |     let combines = combiner.enable_combining().unwrap();
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_combines`
+
+warning: `badlang` (bin "badlang") generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.01s
+     Running `target/debug/badlang tutorial`
+[
+    Integer(
+        34,
+    ),
+]

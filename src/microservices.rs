@@ -1,4 +1,4 @@
-// This part of the program serves absolutely no reason is just here
+// This part of the program serves absolutely no reason and is just here
 // because I find it incredibly funny. More about the motivation can be read here: https://github.com/gianzellweger/badlang/blob/release/MOTIVATION.md
 
 // List of "features" and a roadmap can be found at https://github.com/gianzellweger/badlang/issues/3
@@ -14,6 +14,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use badlang_parser as pa;
 use colored::Colorize;
 use inquire::{validator::Validation, CustomUserError};
 use rand::distr::Distribution;
@@ -100,13 +101,41 @@ impl Distribution<Advertisement> for rand::distr::StandardUniform {
 //     let _ = window.set_focus();
 // }
 
+#[derive(Debug, Savefile, Clone)]
+pub struct EditorState {
+    pub text:              Vec<String>,
+    pub cursor:            (u16, u16),
+    pub console:           Result<String, String>,
+    pub level:             u8,
+    pub unlocked_features: Vec<pa::Token>,
+}
+
+impl std::default::Default for EditorState {
+    fn default() -> Self {
+        Self {
+            text:              vec![],
+            cursor:            (0, 0),
+            console:           Ok(String::new()),
+            level:             0,
+            unlocked_features: vec![pa::Token::StackValue(pa::StackValue::Integer(0)), pa::Token::Print, pa::Token::Println],
+        }
+    }
+}
+
+#[derive(Savefile, Clone, Debug)]
+pub enum TwoFA {
+    GoogleAuth(String),
+    SecurityQuestion(Vec<String>),
+    OS,
+}
+
 #[derive(Savefile, Clone, Debug)]
 pub struct Account {
-    pub name:               String,
+    pub name:          String,
     // Yes I am actually taking a programming account (that doesn't do anything) serious enough to actually use encryption.
-    pub password_hash:      String,
-    pub version:            String,
-    pub google_auth_secret: String,
+    pub password_hash: String,
+    pub version:       String,
+    pub two_factor:    TwoFA,
 }
 
 #[derive(Savefile, Clone, Debug, Default)]
@@ -115,6 +144,7 @@ pub struct SaveData {
     pub runs_so_far:       usize,
     pub last_update:       u64,  // This is in seconds since UNIX_EPOCH
     pub dialogs_displayed: bool, // It makes sense to display them only once per device, as this is how it works in serious applications.
+    pub tutorial_state:    EditorState,
 }
 
 // These files are used to measure download speed. There are multiple
@@ -423,32 +453,100 @@ pub fn login(account: &mut Option<Account>) {
             let salt = SaltString::generate(&mut OsRng);
             let password_hash = argon2.hash_password(password.as_bytes(), &salt).expect("What happened? Why did the hasher fail?").to_string();
 
-            let ga = google_authenticator::GoogleAuthenticator::new();
-            let secret = ga.create_secret(32);
-            let scheme = format!(
-                "otpauth://totp/{}?secret={}&issuer={}",
-                percent_encoding::utf8_percent_encode(name.as_str(), percent_encoding::NON_ALPHANUMERIC),
-                secret,
-                percent_encoding::utf8_percent_encode("BadLang™", percent_encoding::NON_ALPHANUMERIC)
-            );
-            let qr_code = qrcode::QrCode::new(scheme.as_bytes()).expect("Wow why no QR-code?");
-
-            println!("{}", qr_code.render().light_color("  ").dark_color("██").build());
-
-            print!(
-                "{}",
-                "This is a 2FA code that secures your account. It is scannable using apps such as Google Authenticator. Do scan it, because it will never ever be available again! Press enter as \
-                 soon as you're ready "
-                    .bright_green()
-                    .bold()
-            );
-
-            let _ = std::io::stdout().flush();
+            let two_factor = match inquire::Select::new(
+                "It is recommended that you use Two Factor Authentification for your Badlang™ Account. Which type would you like to use?",
+                vec!["Google Authenticator", "Security questions", "Biometrics"],
+            )
+            .without_help_message()
+            .prompt()
+            .expect("What the fuck?")
             {
-                let mut buffer = String::new();
-                let stdin = std::io::stdin();
-                let _ = stdin.read_line(&mut buffer);
-            }
+                "Google Authenticator" => {
+                    let ga = google_authenticator::GoogleAuthenticator::new();
+                    let secret = ga.create_secret(32);
+                    let scheme = format!(
+                        "otpauth://totp/{}?secret={}&issuer={}",
+                        percent_encoding::utf8_percent_encode(name.as_str(), percent_encoding::NON_ALPHANUMERIC),
+                        secret,
+                        percent_encoding::utf8_percent_encode("BadLang™", percent_encoding::NON_ALPHANUMERIC)
+                    );
+                    let qr_code = qrcode::QrCode::new(scheme.as_bytes()).expect("Wow why no QR-code?");
+
+                    println!("{}", qr_code.render().light_color("  ").dark_color("██").build());
+
+                    print!(
+                        "{}",
+                        "This is a 2FA code that secures your account. It is scannable using apps such as Google Authenticator. Do scan it, because it will never ever be available again! Press \
+                         enter as soon as you're ready "
+                            .bright_green()
+                            .bold()
+                    );
+
+                    let _ = std::io::stdout().flush();
+                    {
+                        let mut buffer = String::new();
+                        let stdin = std::io::stdin();
+                        let _ = stdin.read_line(&mut buffer);
+                    }
+                    TwoFA::GoogleAuth(secret)
+                }
+                "Security questions" => {
+                    let security_questions = vec![
+                        "What's your mothers maiden name?",
+                        "What's your favorite color?",
+                        "What city were you born in?",
+                        "How do you feel about geese?",
+                        "What are you wearing right now?",
+                        "Are you able to do a handstand?",
+                        "Favorite toe?",
+                        "What day is it today?",
+                        "List all the funny numbers on your credit card separated by a slash.",
+                        "Did you lie on any of our questions?",
+                        "Now answer the last question honestly",
+                    ];
+                    let mut answers = vec![];
+                    for security_question in security_questions {
+                        answers.push(
+                            inquire::Text::new(security_question)
+                                .with_validator(inquire::min_length!(4))
+                                .prompt()
+                                .expect("Answer the question dammit!"),
+                        );
+                    }
+                    TwoFA::SecurityQuestion(answers)
+                }
+                "Biometrics" => {
+                    use robius_authentication as ro_au;
+
+                    let policy = ro_au::PolicyBuilder::new()
+                        .biometrics(Some(ro_au::BiometricStrength::Strong))
+                        .password(true)
+                        .watch(true)
+                        .wrist_detection(true)
+                        .build()
+                        .unwrap();
+
+                    let text = ro_au::Text {
+                        android: ro_au::AndroidText {
+                            title:       "Holy fuck!",
+                            subtitle:    Some("You managed to make it run on android! You're probably the first and only person to ever see this! Here take a cookie 🍪"),
+                            description: Some(
+                                "Also if you somehow actually made this run on an android for whatever reason and are not just reading source code, please do send me a screenshot on Mail or \
+                                 Instagram",
+                            ),
+                        },
+                        apple:   "steal your biometrics in order to clone you once technology advances far enough",
+                        windows: ro_au::WindowsText::new("BadLang™ needs you to authenticate yourself", "Data collected may be share with third or even fourth parties.").expect("Yurr"),
+                    };
+
+                    let auth_result = ro_au::Context::new(()).blocking_authenticate(text, &policy);
+                    if auth_result.is_err() {
+                        report_error("Your 2FA failed!");
+                    }
+                    TwoFA::OS
+                }
+                _ => report_error("What the hell?"),
+            };
 
             inquire::Text::new(TERMS_OF_SERVICE)
                 .with_validator(|v: &str| {
@@ -467,7 +565,7 @@ pub fn login(account: &mut Option<Account>) {
                 name,
                 password_hash,
                 version: semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("WTF cargo").to_string(),
-                google_auth_secret: secret,
+                two_factor,
             });
             println!("{}! Account saved!", "SUCCESS".green());
         }
@@ -518,17 +616,55 @@ pub fn login(account: &mut Option<Account>) {
             if !(name == account.name && argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok()) {
                 report_error("Either your name or password were wrong. Try again!");
             }
+            match &account.two_factor {
+                TwoFA::GoogleAuth(secret) => {
+                    let auth_code = inquire::Text::new("Enter your Google Authenticator code:")
+                        .with_validator(inquire::required!())
+                        .with_validator(inquire::length!(6))
+                        .prompt()
+                        .expect("Enter your auth code");
 
-            let auth_code = inquire::Text::new("Enter your Google Authenticator code:")
-                .with_validator(inquire::required!())
-                .with_validator(inquire::length!(6))
-                .prompt()
-                .expect("Enter your auth code");
+                    let ga = google_authenticator::GoogleAuthenticator::new();
 
-            let ga = google_authenticator::GoogleAuthenticator::new();
+                    if !ga.verify_code(secret.as_str(), auth_code.as_str(), 0, 0) {
+                        report_error("Your auth code was wrong!");
+                    }
+                }
+                TwoFA::SecurityQuestion(answers) => {
+                    let answer = inquire::Text::new("Enter an answer to a security question:").prompt().expect("Enter the answer dammit!");
+                    if !answers.contains(&answer) {
+                        report_error("Your answer was wrong!");
+                    }
+                }
+                TwoFA::OS => {
+                    use robius_authentication as ro_au;
 
-            if !ga.verify_code(account.google_auth_secret.as_str(), auth_code.as_str(), 0, 0) {
-                report_error("Your auth code was wrong!");
+                    let policy = ro_au::PolicyBuilder::new()
+                        .biometrics(Some(ro_au::BiometricStrength::Strong))
+                        .password(true)
+                        .watch(true)
+                        .wrist_detection(true)
+                        .build()
+                        .unwrap();
+
+                    let text = ro_au::Text {
+                        android: ro_au::AndroidText {
+                            title:       "Holy fuck!",
+                            subtitle:    Some("You managed to make it run on android! You're probably the first and only person to ever see this! Here take a cookie 🍪"),
+                            description: Some(
+                                "Also if you somehow actually made this run on an android for whatever reason and are not just reading source code, please do send me a screenshot on Mail or \
+                                 Instagram",
+                            ),
+                        },
+                        apple:   "steal your biometrics in order to clone you once technology advances far enough",
+                        windows: ro_au::WindowsText::new("BadLang™ needs you to authenticate yourself", "Data collected may be share with third or even fourth parties.").expect("Fuck why?"),
+                    };
+
+                    let auth_result = ro_au::Context::new(()).blocking_authenticate(text, &policy);
+                    if auth_result.is_err() {
+                        report_error("Your 2FA failed!");
+                    }
+                }
             }
 
             println!("{}! Logged into your account!", "SUCCESS".green().bold());
