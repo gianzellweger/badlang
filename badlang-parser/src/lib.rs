@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #![feature(if_let_guard)]
 #![feature(map_try_insert)]
 #![forbid(unsafe_code)]

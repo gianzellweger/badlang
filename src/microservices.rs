@@ -16,7 +16,7 @@ use argon2::{
 };
 use colored::Colorize;
 use inquire::{validator::Validation, CustomUserError};
-use rand::distributions::Distribution;
+use rand::distr::Distribution;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
 
@@ -50,11 +50,11 @@ impl std::fmt::Display for Advertisement {
     }
 }
 
-impl Distribution<Advertisement> for rand::distributions::Standard {
+impl Distribution<Advertisement> for rand::distr::StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Advertisement {
         static_assertions::const_assert_eq!(Advertisement::COUNT, 7); // If the match below isn't updated when a new Advertisement is added, it
                                                                       // won't be added to the rotation
-        match rng.gen_range(0..Advertisement::COUNT) {
+        match rng.random_range(0..Advertisement::COUNT) {
             0 => Advertisement::Temu,
             1 => Advertisement::Shein,
             2 => Advertisement::BetterHelp,
@@ -67,38 +67,38 @@ impl Distribution<Advertisement> for rand::distributions::Standard {
     }
 }
 
-#[allow(dead_code)]
-#[allow(clippy::needless_pass_by_value)]
-#[tauri::command]
-pub fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
-    static VELOCITY: Mutex<(i32, i32)> = Mutex::new((4, 4));
-    static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
+// #[allow(dead_code)]
+// #[allow(clippy::needless_pass_by_value)]
+// #[tauri::command]
+// pub fn tauri_handler<R: tauri::Runtime>(window: tauri::Window<R>) {
+//     static VELOCITY: Mutex<(i32, i32)> = Mutex::new((4, 4));
+//     static POSITION: Mutex<(i32, i32)> = Mutex::new((0, 0));
 
-    let (screen_x, screen_y) = window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .map(|monitor| *monitor.size())
-        .map_or((1920, 1080), |pos| (pos.height as i32, pos.width as i32));
+//     let (screen_x, screen_y) = window
+//         .current_monitor()
+//         .ok()
+//         .flatten()
+//         .map(|monitor| *monitor.size())
+//         .map_or((1920, 1080), |pos| (pos.height as i32, pos.width as i32));
 
-    let mut position = POSITION.lock().expect("Unreachable");
-    let mut velocity = VELOCITY.lock().expect("Unreachable");
-    if position.0 > screen_x || position.0 < 0 {
-        velocity.0 = -velocity.0;
-    }
-    if position.1 > screen_y || position.1 < 0 {
-        velocity.1 = -velocity.1;
-    }
+//     let mut position = POSITION.lock().expect("Unreachable");
+//     let mut velocity = VELOCITY.lock().expect("Unreachable");
+//     if position.0 > screen_x || position.0 < 0 {
+//         velocity.0 = -velocity.0;
+//     }
+//     if position.1 > screen_y || position.1 < 0 {
+//         velocity.1 = -velocity.1;
+//     }
 
-    position.0 += velocity.0;
-    position.1 += velocity.1;
-    drop(velocity);
+//     position.0 += velocity.0;
+//     position.1 += velocity.1;
+//     drop(velocity);
 
-    let _ = window.set_position(tauri::Position::Physical((*position).into()));
-    drop(position);
+//     let _ = window.set_position(tauri::Position::Physical((*position).into()));
+//     drop(position);
 
-    let _ = window.set_focus();
-}
+//     let _ = window.set_focus();
+// }
 
 #[derive(Savefile, Clone, Debug)]
 pub struct Account {
@@ -251,7 +251,7 @@ pub fn password_validator(password: &str) -> Result<Validation, CustomUserError>
     if top_100_passwords.is_none() {
         *top_100_passwords =
             Some(fetch_data("https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10-million-password-list-top-10000.txt").unwrap_or_default());
-    };
+    }
 
     let password_list = if top_100_passwords.as_ref().is_some_and(Vec::is_empty) {
         None
@@ -309,36 +309,36 @@ pub fn server_outage() {
 }
 
 pub fn show_dialogs() {
-    let _ = native_dialog::MessageDialog::new()
-        .set_type(native_dialog::MessageType::Warning)
+    let _ = native_dialog::DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Warning)
         .set_title("BadLang™")
         .set_text(r#""BadLang™" wants to access your contacts. Allow?"#)
-        .show_confirm();
-    let _ = native_dialog::MessageDialog::new()
-        .set_type(native_dialog::MessageType::Warning)
+        .confirm();
+    let _ = native_dialog::DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Warning)
         .set_title("BadLang™")
         .set_text(r#""BadLang™" wants to access your location. Allow?"#)
-        .show_confirm();
-    let _ = native_dialog::MessageDialog::new()
-        .set_type(native_dialog::MessageType::Warning)
+        .confirm();
+    let _ = native_dialog::DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Warning)
         .set_title("BadLang™")
         .set_text(r#""BadLang™" wants to make and receive phone calls on your behalf. Allow?"#)
-        .show_confirm();
-    let _ = native_dialog::MessageDialog::new()
-        .set_type(native_dialog::MessageType::Warning)
+        .confirm();
+    let _ = native_dialog::DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Warning)
         .set_title("BadLang™")
         .set_text(r#""BadLang™" wants to manage incoming network connections. Allow?"#)
-        .show_confirm();
-    let _ = native_dialog::MessageDialog::new()
-        .set_type(native_dialog::MessageType::Warning)
+        .confirm();
+    let _ = native_dialog::DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Warning)
         .set_title("BadLang™")
         .set_text(r#""BadLang™" wants to access your passwords. Allow?"#)
-        .show_confirm();
-    let _ = native_dialog::MessageDialog::new()
-        .set_type(native_dialog::MessageType::Warning)
+        .confirm();
+    let _ = native_dialog::DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Warning)
         .set_title("BadLang™")
         .set_text(r#""BadLang™" wants to access your liver. Allow?"#)
-        .show_confirm();
+        .confirm();
 }
 
 pub fn mailing_list_notification() {

@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #![feature(if_let_guard)]
 #![feature(map_try_insert)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -31,40 +30,19 @@ mod tutorial;
 use microservices as ms;
 
 fn sillyness(save_data: &mut ms::SaveData) {
-    // This macos version panics for some reason currently. This code should
-    // theoretically work, tauri is just buggy. #[cfg(target_os = "macos")]
-    // {
-    //     println!(
-    //         "Because you're on MacOS, the Video Player sadly cannot run
-    // on another thread. You need to quit it to continue!"
-    //     );
-    //     let mut app = tauri::Builder::default()
+    // jod_thread::spawn(|| {
+    //     tauri::Builder::default()
+    //         .any_thread()
     //         .invoke_handler(tauri::generate_handler!(ms::tauri_handler))
     //         .build(tauri::generate_context!())
-    //         .expect("error while building tauri application");
-
-    //     loop {
-    //         let iteration = app.run_iteration();
-    //         if iteration.window_count == 0 {
-    //             tauri::api::process::kill_children();
-    //             break;
-    //         }
-    //     }
-    // }
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    jod_thread::spawn(|| {
-        tauri::Builder::default()
-            .any_thread()
-            .invoke_handler(tauri::generate_handler!(ms::tauri_handler))
-            .build(tauri::generate_context!())
-            .expect("error while building tauri application")
-            .run(|_app_handle, event| {
-                if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                    api.prevent_exit();
-                }
-            });
-    })
-    .detach();
+    //         .expect("error while building tauri application")
+    //         .run(|_app_handle, event| {
+    //             if let tauri::RunEvent::ExitRequested { api, .. } = event {
+    //                 api.prevent_exit();
+    //             }
+    //         });
+    // })
+    // .detach();
 
     ms::has_internet();
     ms::server_outage();
@@ -152,10 +130,8 @@ fn main() {
 
                 sillyness(&mut save_data);
 
-                if let Some(parent_dir) = savefile_path.parent() {
-                    if let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
-                        report_error(format!("Couldn't create savefile because {err}").as_str());
-                    }
+                if let Some(parent_dir) = savefile_path.parent() && let Err(err) = std::fs::DirBuilder::new().recursive(true).create(parent_dir) {
+                    report_error(format!("Couldn't create savefile because {err}").as_str());
                 }
 
                 save_file(savefile_path, 0, &save_data).expect("Couldn't save damn");
