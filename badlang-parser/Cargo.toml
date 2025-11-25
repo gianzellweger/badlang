@@ -2,8 +2,8 @@
 name = "badlang-parser"
 version = "0.1.0"
 authors = ["The BadLang™ Developers <contact@badlang.dev>"]
-edition = "2021"
-rust-version = "1.78.0"
+edition = "2024"
+rust-version = "1.90.0"
 description = "Internal parser for badlang, not meant for public consumption"
 reporsitory = "https://github.com/gianzellweger/badlang"
 license = "CC0-1.0"
